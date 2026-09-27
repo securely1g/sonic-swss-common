@@ -3,6 +3,9 @@ set -euo pipefail
 
 package_archive="$1"
 symbols_archive="$2"
+expected_multiarch="$3"
+objcopy="$4"
+gdb="$5"
 package_root="${TEST_TMPDIR}/libswsscommon-package"
 symbols_root="${TEST_TMPDIR}/libswsscommon-symbols"
 
@@ -56,7 +59,7 @@ validate_debug_pair() {
     fi
 
     debuglink_file="${TEST_TMPDIR}/${build_id}.debuglink"
-    objcopy --dump-section ".gnu_debuglink=${debuglink_file}" \
+    "${objcopy}" --dump-section ".gnu_debuglink=${debuglink_file}" \
         "${runtime_file}" "${TEST_TMPDIR}/${build_id}.elf"
     python3 - "${debuglink_file}" "${debug_file}" <<'PY'
 from pathlib import Path
@@ -93,6 +96,12 @@ if [[ "${#runtime_libraries[@]}" -ne 1 ]]; then
     exit 1
 fi
 
+expected_runtime_library="${package_root}/usr/lib/${expected_multiarch}/${soname}"
+if [[ "${runtime_libraries[0]}" != "${expected_runtime_library}" ]]; then
+    echo "Expected ${soname} in usr/lib/${expected_multiarch}; found ${runtime_libraries[0]}" >&2
+    exit 1
+fi
+
 if ! resolved_library="$(realpath --canonicalize-existing "${runtime_libraries[0]}")"; then
     echo "Packaged ${soname} does not resolve to a file" >&2
     exit 1
@@ -111,6 +120,25 @@ if [[ "${packaged_soname}" != "${soname}" ]]; then
     exit 1
 fi
 
+if [[ "${expected_multiarch}" == "arm-linux-gnueabihf" ]]; then
+    # AAELF32 records the floating-point procedure-call standard in e_flags for
+    # linked ET_EXEC/ET_DYN files. Build attributes are optional after linking.
+    for binary in "${resolved_library}" "${package_root}/usr/bin/swssloglevel"; do
+        header="$(LC_ALL=C readelf --file-header "${binary}")"
+        if ! grep -q 'Class:.*ELF32' <<<"${header}" ||
+            ! grep -q 'Machine:.*ARM' <<<"${header}" ||
+            ! grep -q 'Flags:.*hard-float ABI' <<<"${header}"; then
+            echo "Expected an ARM ELF32 hard-float binary: ${binary}" >&2
+            exit 1
+        fi
+    done
+    if ! LC_ALL=C readelf --program-headers "${package_root}/usr/bin/swssloglevel" |
+        grep -q 'Requesting program interpreter: /lib/ld-linux-armhf.so.3'; then
+        echo "The packaged ARMHF tool must use /lib/ld-linux-armhf.so.3" >&2
+        exit 1
+    fi
+fi
+
 library_dir="$(dirname "${resolved_library}")"
 assert_equal "Runtime library filename" "libswsscommon.so.0.0.0" "$(basename "${resolved_library}")"
 assert_equal "SONAME symlink" "libswsscommon.so.0.0.0" "$(readlink "${library_dir}/${soname}")"
@@ -122,7 +150,7 @@ validate_debug_pair "${resolved_library}"
 validate_debug_pair "${package_root}/usr/bin/swssloglevel"
 
 gdb_output="${TEST_TMPDIR}/libswsscommon-gdb.txt"
-gdb --batch --nx --quiet \
+"${gdb}" --batch --nx --quiet \
     -ex "set debuginfod enabled off" \
     -ex "set debug-file-directory ${symbols_root}/usr/lib/debug" \
     -ex "file ${resolved_library}" \
@@ -133,4 +161,4 @@ if ! grep -Eq 'Line [0-9]+ of ".*common/redisreply\.cpp"' "${gdb_output}"; then
     exit 1
 fi
 
-echo "Runtime package layout and detached debug information are valid"
+echo "Runtime package layout and detached debug information are valid for ${expected_multiarch}"

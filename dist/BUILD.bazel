@@ -63,6 +63,7 @@ DIST_LOOSE_COMMON_MTREE = [
     for cpu, multiarch in [
         ("x86_64", "x86_64-linux-gnu"),
         ("arm64", "aarch64-linux-gnu"),
+        ("armv7", "arm-linux-gnueabihf"),
     ]
 ]
 
@@ -71,6 +72,7 @@ alias(
     actual = select({
         "@platforms//cpu:x86_64": ":dist_loose_x86_64",
         "@platforms//cpu:arm64": ":dist_loose_arm64",
+        "@platforms//cpu:armv7": ":dist_loose_armv7",
     }),
 )
 
@@ -79,6 +81,7 @@ alias(
     actual = select({
         "@platforms//cpu:x86_64": ":dist_loose_x86_64.debug_symbols",
         "@platforms//cpu:arm64": ":dist_loose_arm64.debug_symbols",
+        "@platforms//cpu:armv7": ":dist_loose_armv7.debug_symbols",
     }),
 )
 
@@ -104,11 +107,30 @@ sh_test(
     args = [
         "$(location :libswsscommon_pkg)",
         "$(location :libswsscommon_pkg.debug_symbols)",
-    ],
+    ] + select({
+        "@platforms//cpu:x86_64": [
+            "x86_64-linux-gnu",
+            "objcopy",
+            "gdb",
+        ],
+        "@platforms//cpu:arm64": [
+            "aarch64-linux-gnu",
+            "objcopy",
+            "gdb",
+        ],
+        "@platforms//cpu:armv7": [
+            "arm-linux-gnueabihf",
+            "$(location @armhf_llvm_llvm//:bin/llvm-objcopy)",
+            "gdb-multiarch",
+        ],
+    }),
     data = [
         ":libswsscommon_pkg",
         ":libswsscommon_pkg.debug_symbols",
-    ],
+    ] + select({
+        "@platforms//cpu:armv7": ["@armhf_llvm_llvm//:bin/llvm-objcopy"],
+        "//conditions:default": [],
+    }),
 )
 
 tar(

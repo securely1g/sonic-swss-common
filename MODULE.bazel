@@ -24,6 +24,15 @@ bazel_dep(name = "tar.bzl", version = "0.10.5")
 bazel_dep(name = "rules_distroless", version = "0.9.4")
 bazel_dep(name = "libnl3", version = "3.7.0.sonic-buildimage")
 bazel_dep(name = "sonic-build-infra", version = "0.0.4-83b4e9d963f7f268d06983a8c954fc5d6d93ce2b", repo_name = "sonic_build_infra")
+bazel_dep(name = "swig", version = "4.3.0.bcr.2")
+bazel_dep(name = "toolchains_llvm", version = "1.10.0")
+
+# Map Debian ARMHF to the Linux ARMv7 CPU used by the C++ and Go toolchains.
+single_version_override(
+    module_name = "rules_distroless",
+    patch_strip = 1,
+    patches = ["//tools/bazel/patches:rules_distroless_armhf_cpu.patch"],
+)
 
 gcc = use_extension("@sonic_build_infra//toolchains/gcc:extensions.bzl", "gcc")
 use_repo(gcc, "gcc_toolchains")
@@ -32,4 +41,74 @@ register_toolchains("@gcc_toolchains//:all")
 
 # The actual dependencies are listed in sonic-build-infra, and re-exported.
 apt = use_extension("@rules_distroless//apt:extensions.bzl", "apt")
-use_repo(apt, "trixie")
+apt.sources_list(
+    architectures = ["armhf"],
+    components = ["main"],
+    suites = [
+        "trixie",
+        "trixie-updates",
+    ],
+    uris = ["https://snapshot.debian.org/archive/debian/20260727T143429Z"],
+)
+apt.sources_list(
+    architectures = ["armhf"],
+    components = ["main"],
+    suites = ["trixie-security"],
+    uris = ["https://snapshot.debian.org/archive/debian-security/20260726T121236Z"],
+)
+use_repo(
+    apt,
+    "trixie",
+    "trixie-security_linux-libc-dev-armhf_6.12.96-1",
+    "trixie_libc6-armhf_2.41-12-deb13u3",
+    "trixie_libc6-dev-armhf_2.41-12-deb13u3",
+    "trixie_libgcc-14-dev-armhf_14.2.0-19",
+    "trixie_libgcc-s1-armhf_14.2.0-19",
+    "trixie_libstdc---14-dev-armhf_14.2.0-19",
+    "trixie_libstdc--6-armhf_14.2.0-19",
+)
+
+# The shared GCC release has native AMD64 and ARM64 toolchains. Use the
+# published LLVM cross toolchain with the same Trixie C/C++ runtime inputs for
+# ARMHF until the shared toolchain includes this execution/target pair.
+armhf_sysroot = use_repo_rule("//tools/bazel/armhf:repositories.bzl", "armhf_sysroot")
+
+armhf_sysroot(
+    name = "armhf_sysroot",
+    packages = [
+        "@trixie-security_linux-libc-dev-armhf_6.12.96-1//:data.tar.xz",
+        "@trixie_libc6-armhf_2.41-12-deb13u3//:data.tar.xz",
+        "@trixie_libc6-dev-armhf_2.41-12-deb13u3//:data.tar.xz",
+        "@trixie_libgcc-14-dev-armhf_14.2.0-19//:data.tar.xz",
+        "@trixie_libgcc-s1-armhf_14.2.0-19//:data.tar.xz",
+        "@trixie_libstdc---14-dev-armhf_14.2.0-19//:data.tar.xz",
+        "@trixie_libstdc--6-armhf_14.2.0-19//:data.tar.xz",
+    ],
+)
+
+llvm = use_extension("@toolchains_llvm//toolchain/extensions:llvm.bzl", "llvm")
+llvm.toolchain(
+    name = "armhf_llvm",
+    extra_compile_flags = {
+        "linux-armv7": [
+            "-march=armv7-a",
+            "-mfpu=vfpv3-d16",
+            "-mfloat-abi=hard",
+        ],
+    },
+    extra_link_flags = {"linux-armv7": ["-mfloat-abi=hard"]},
+    llvm_version = "20.1.4",
+    multiarch = {"linux-armv7": "arm-linux-gnueabihf"},
+    stdlib = {"linux-armv7": "dynamic-stdc++-14"},
+)
+llvm.sysroot(
+    name = "armhf_llvm",
+    label = "@armhf_sysroot//:files",
+    targets = ["linux-armv7"],
+)
+llvm.extra_target_compatible_with(
+    name = "armhf_llvm",
+    constraints = ["@sonic_build_infra//platforms:trixie"],
+    targets = ["linux-armv7"],
+)
+use_repo(llvm, "armhf_llvm", "armhf_llvm_llvm")

@@ -3,19 +3,29 @@
 The standalone build uses Bazel 8.5.1, selected by `.bazelversion`. Install
 [Bazelisk](https://bazel.build/install/bazelisk) and invoke it as `bazel`.
 Dependencies come from the configured SONiC Bazel registry and the Bazel Central
-Registry; the native GCC 14.2 toolchain and Debian package inputs are downloaded
-by Bazel.
+Registry. Bazel downloads the native GCC 14.2 toolchains, the LLVM 20.1.4 ARMHF
+toolchain, and the Debian package inputs.
 
 ## Environment
 
-Use a native AMD64 or ARM64 Linux environment with Debian Trixie userspace. The
-toolchains require the execution CPU and target CPU to match. AMD64 is the
-default; native ARM64 requires `--config=aarch64`. The target libraries link
-against Trixie's glibc 2.41, so CI runs inside a Trixie container on each native
-GitHub-hosted runner.
+Use Debian Trixie userspace on the execution host. The supported configurations
+are:
 
-CI uses `debian:trixie-20260918` and installs these host tools. The package test
-uses `readelf` and `objcopy` from `binutils`, GDB, Python, and `tar`.
+| Configuration | Execution host in CI | Target and compiler |
+| --- | --- | --- |
+| Default | AMD64 | AMD64, GCC 14.2 |
+| `--config=aarch64` | ARM64 | ARM64, GCC 14.2 |
+| `--config=armhf` | ARM64 | ARMv7 hard-float, LLVM 20.1.4 |
+
+The native GCC toolchains require the execution and target CPUs to match. The
+ARMHF configuration runs Bazel and SWIG on ARM64 and uses LLVM for cross
+compilation. Its target ABI is Debian `arm-linux-gnueabihf`: ARMv7-A,
+VFPv3-D16, EABI5 hard-float, and `/lib/ld-linux-armhf.so.3`. It uses the same
+Trixie glibc 2.41 and GCC 14 libstdc++/libgcc runtime packages as the shared
+toolchain inputs. Go targets `linux/arm` with GOARM 7.
+
+CI uses `debian:trixie-20260918` and installs these host tools. Native package
+tests use `readelf` and `objcopy` from `binutils`, GDB, Python, and `tar`.
 
 ```sh
 apt-get update
@@ -23,15 +33,18 @@ apt-get install -y --no-install-recommends \
   binutils build-essential ca-certificates gdb git python3 tar
 ```
 
+The ARMHF job also installs `gdb-multiarch` and `qemu-user`. Its package test
+uses the pinned LLVM `objcopy` and `gdb-multiarch` to inspect ARM binaries.
+QEMU executes the target C++, Go, and Python binaries while Bazel and build
+tools continue to run on the ARM64 host.
+
 ## Build and test
 
-Run the following from the repository root in Bash. Define the explicit target
-list once, then run the command matching the machine's native CPU. CI uses the
-same flags and target list. Explicit labels make a required output's platform
-incompatibility fail the invocation instead of being skipped by a wildcard.
+Run the following from the repository root in Bash. CI uses these explicit
+labels so a required output's platform incompatibility fails the invocation.
 
 ```bash
-targets=(
+outputs=(
   //:libswsscommon
   //:libswsscommon_shared
   //:libswsscommon_consolidated.so
@@ -41,24 +54,46 @@ targets=(
   //dist:sonic-db-cli_pkg
   //pyext:swsscommon_pkg
   //goext:swsscommon
+)
+compiled_tests=(
   //tests:status_code_util_test
   //tests:saiaclschema_ut
   //tests:notification_queue_ut
   //tests:interface_ut
   //tests:vrf_ut
   //tests:shared_library_runtime_test
+)
+package_tests=(
   //dist:libswsscommon_package_test
+  //goext:swsscommon_runtime_test
 )
 
 # Native AMD64
-bazel test --//tools/bazel:yang_modules=False --test_output=errors "${targets[@]}"
+bazel test --//tools/bazel:yang_modules=False --test_output=errors \
+  "${outputs[@]}" "${compiled_tests[@]}" "${package_tests[@]}"
 
 # Native ARM64
-bazel test --config=aarch64 --//tools/bazel:yang_modules=False --test_output=errors "${targets[@]}"
+bazel test --config=aarch64 --//tools/bazel:yang_modules=False --test_output=errors \
+  "${outputs[@]}" "${compiled_tests[@]}" "${package_tests[@]}"
+
+# ARMHF packages and host shell tests, from an ARM64 host with qemu-user
+bazel test --config=armhf --//tools/bazel:yang_modules=False --jobs=4 --test_output=errors \
+  "${outputs[@]}" "${package_tests[@]}" //tools/bazel/armhf:python_runtime_test
+
+# ARMHF C++ tests, using the scoped QEMU runner
+bazel test --config=armhf --//tools/bazel:yang_modules=False --jobs=4 --test_output=errors \
+  --run_under=//tools/bazel/armhf:qemu_run_under "${compiled_tests[@]}"
 ```
 
 `bazel test` builds the listed libraries, binaries, bindings, and packages as
-well as running the listed tests. CI also checks Bazel file formatting:
+well as running the listed tests. For ARMHF, the package inspection remains a
+host shell test. The scoped runner extracts the pinned target runtime and
+verifies that each C++ test is an ARM ELF32 hard-float binary before starting
+QEMU. The Go and Python host tests invoke QEMU for their target binaries. The
+Python test extracts the target runtime and package, verifies their ELF
+architecture, then imports and calls the binding using the ARMHF interpreter.
+
+CI also checks Bazel file formatting on the native jobs:
 
 ```sh
 # Native AMD64
@@ -80,6 +115,7 @@ artifact for your architecture from the **Artifacts** section:
 
 - `sonic-swss-common-no-yang-AMD64`
 - `sonic-swss-common-no-yang-ARM64`
+- `sonic-swss-common-no-yang-ARMHF`
 
 Each download contains these four archives:
 
@@ -90,8 +126,10 @@ Each download contains these four archives:
 - `sonic-db-cli_pkg.tar`: database CLI.
 - `swsscommon_pkg.tar.gz`: Python bindings.
 
-These are native Debian Trixie builds using the no-YANG configuration described
-below. GitHub requires you to sign in to download workflow artifacts.
+These target Debian Trixie using the no-YANG configuration described below.
+The runtime library is installed under the target multiarch directory:
+`x86_64-linux-gnu`, `aarch64-linux-gnu`, or `arm-linux-gnueabihf`. GitHub requires
+you to sign in to download workflow artifacts.
 
 ## Debug symbols
 
@@ -102,7 +140,8 @@ bazel build --//tools/bazel:yang_modules=False \
   //dist:libswsscommon_pkg //dist:libswsscommon_pkg.debug_symbols
 ```
 
-Add `--config=aarch64` on native ARM64. Packaging uses `sonic_deploy_tar` with
+Add `--config=aarch64` on native ARM64 or `--config=armhf` for the ARMHF target.
+Packaging uses `sonic_deploy_tar` with
 `force_debug_build = True`, which applies `--copt=-g`, `--strip=never`, and a
 linker build ID to the package inputs while retaining the selected compilation
 mode and optimization settings. It derives the runtime copy and detached debug
@@ -130,10 +169,51 @@ not wired into Bazel yet. The supported configuration uses the minimal schema
 stub and omits the YANG-dependent sources. YANG functionality remains outside
 this CI coverage.
 
-The Go binding target is included in CI. Its Redis-backed integration test,
+The Go binding and a small consuming test are included in CI. The consuming
+test links the cgo wrapper and calls wrapped value types and `Select` without
+Redis. It checks that the current `libswsscommon` and staged hiredis library
+were loaded, and the no-YANG test rejects loading libyang. A host wrapper stages
+the pinned Trixie runtime libraries before starting the test. Ordinary Go
+consumers still need matching native libraries and loader configuration. Its
+Redis-backed integration test,
 `//goext:swsscommon_test`, is tagged `manual` and requires the expected Redis
 endpoints and database configuration. Run that test separately in an environment
-providing those services; the standalone CI target list does not start Redis.
+providing those services and the matching native runtime libraries; the
+standalone CI target list does not start Redis.
+
+## ARMHF integration boundary
+
+The ARMHF setup is for the standalone Bazel 8.5.1 entry point. `MODULE.bazel`
+adds ARMHF to the shared pinned Trixie package sources, applies the
+rules_distroless ARMHF CPU mapping fix, and assembles the shared sysroot package
+archives into the directory LLVM expects. The published shared GCC toolchains
+currently cover native AMD64 and ARM64, so ARMHF uses LLVM while retaining the
+Debian GCC 14 runtime libraries. The ARMHF configuration registers the pinned
+LLVM inspection tools with the existing binutils toolchain interface so the
+same debug-package rule can split ARM binaries.
+
+`tools/bazel/armhf/swig.bzl` supplies the ARMHF binding action. It uses the same
+pinned host SWIG and current header inputs as the shared generator, omits
+`SWIGWORDSIZE64`, and uses `-intgosize 32` for Go. The native generator calls
+keep their existing API, including WORKSPACE and local infra override use.
+The ARMHF Go link selects lld and PIE mode so Go emits position-independent
+objects for LLVM's PIE executable link; native paths retain bfd and their
+existing Go link mode. The Go host wrapper selects its explicit QEMU mode for
+ARMHF and disables rules_go's XML wrapper, which re-executes the binary, so its
+single execution stays inside QEMU. Bazel still records the test's exit status
+and log.
+The ARMHF configuration omits GCC's numeric strict-aliasing warning flag. It
+keeps `-Werror` but leaves the observed LLVM diagnostics for existing component
+and dependency-header patterns as warnings; the exact list is in
+`tools/bazel/flags.bzl`. Native warning policy is unchanged. ARMHF also disables
+optional Python bytecode precompilation because no ARMHF rules_python interpreter
+toolchain is registered. The Python archive retains its sources, which the
+package test runs with the extracted Trixie ARMHF interpreter.
+
+A consuming root does not automatically import this repository's `.bazelrc` or
+apply its root module override. Top-level sonic-buildimage ARMHF integration
+must register the platform and toolchains, adopt the CPU mapping fix, and
+validate its own graph. This standalone support does not claim that integration.
 
 ## CodeQL C++ build
 

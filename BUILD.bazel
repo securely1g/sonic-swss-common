@@ -4,6 +4,7 @@ load("@bazel_skylib//rules:common_settings.bzl", "bool_flag")
 # load("@rules_cc//cc:cc_binary.bzl", "cc_binary")
 # load("@rules_cc//cc:cc_library.bzl", "cc_library")
 load("//tools/bazel:always_link_transition.bzl", "alwayslink_cc_binary")
+load("//tools/bazel:bzlmod.bzl", "IS_BZLMOD")
 load("//tools/bazel:cc.bzl", "swss_cc_binary")
 load(
     "//tools/bazel:deps.bzl",
@@ -27,6 +28,8 @@ filegroup(
 # Necessary for when we import swss_common as a prebuilt .so file.
 # We want all the deps from swsscommon, but none of the symbols.
 # The symbols will come from the prebuilt .so file.
+# This source-free dependency also keeps the Bzlmod Boost link flag with the
+# package search paths when :common is linked into a final binary.
 # TODO Remove once the cc_shared_library version of swss_common works with rules_distroless.
 cc_library(
     name = "common_deps",
@@ -63,9 +66,11 @@ cc_library(
     includes = [
         "common",
     ],
-    linkopts = SWSS_COMMON_LINKOPTS,
+    # The automatic libcommon.so link does not receive dependency link paths.
+    # Keep the Bzlmod Boost flag in :common_deps so final links receive both.
+    linkopts = [] if IS_BZLMOD else SWSS_COMMON_LINKOPTS,
     visibility = ["//visibility:public"],
-    deps = SWSS_COMMON_DEPS,
+    deps = [":common_deps"] if IS_BZLMOD else SWSS_COMMON_DEPS,
     # Force all symbols to be included when linking into shared library
     # This is required for the consolidated .so to export all symbols needed by SWIG bindings
     # However, some builds like `sonic-swss` will refuse to link if they are always linked,

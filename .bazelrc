@@ -10,7 +10,13 @@ common --registry=https://bcr.bazel.build/
 try-import %workspace%/../../tools/bazel/submodule-config.bazelrc
 
 # Build all release binaries for `trixie`.
-# These are host toolchains (exec == target == $cpu),
-# so --config=aarch64 only resolves when Bazel itself is running on an aarch64 machine.
+# The default and aarch64 configurations use native host toolchains
+# (exec == target == $cpu). The ARMHF configuration cross-compiles with LLVM.
 common --platforms=@sonic_build_infra//platforms:x86_64_trixie
 common:aarch64 --platforms=@sonic_build_infra//platforms:aarch64_trixie
+common:armhf --platforms=//tools/bazel/armhf:platform
+common:armhf --extra_toolchains=@armhf_llvm//:cc-toolchain-armv7-linux,//tools/bazel/armhf:binutils_x86_64,//tools/bazel/armhf:binutils_arm64
+# Match LLVM's PIE executable link with position-independent Go objects.
+common:armhf --@io_bazel_rules_go//go/config:linkmode=pie
+# No ARMHF rules_python interpreter toolchain is registered; packages retain sources.
+common:armhf --@rules_python//python/config_settings:precompile=force_disabled

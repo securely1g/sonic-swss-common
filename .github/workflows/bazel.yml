@@ -61,6 +61,7 @@ jobs:
           //dist:sonic-db-cli_pkg
           //pyext:swsscommon_pkg
           //goext:swsscommon
+          //goext:swsscommon_runtime_test
           //tests:status_code_util_test
           //tests:saiaclschema_ut
           //tests:notification_queue_ut
@@ -83,5 +84,85 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: sonic-swss-common-no-yang-${{ matrix.arch }}
+          path: artifacts/
+          if-no-files-found: error
+
+  armhf:
+    name: Bazel (ARMHF)
+    timeout-minutes: 90
+    runs-on: ubuntu-24.04-arm
+    container: debian:trixie-20260918
+    steps:
+      - name: Install host build and ARMHF execution tools
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            binutils build-essential ca-certificates gdb-multiarch git python3 qemu-user tar
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: bazel-contrib/setup-bazel@c5acdfb288317d0b5c0bbd7a396a3dc868bb0f86 # 0.19.0
+        with:
+          bazelisk-version: 1.29.0
+          bazelisk-cache: true
+          repository-cache: true
+          disk-cache: ${{ github.workflow }}
+          cache-version: "8.5.1"
+
+      - name: Verify ARM64 execution host
+        run: |
+          test "$(uname -m)" = aarch64
+          test "$(dpkg --print-architecture)" = arm64
+          qemu-arm --version
+
+      - name: Build ARMHF outputs and test packages without YANG
+        run: >-
+          bazel test
+          --config=armhf
+          --//tools/bazel:yang_modules=False
+          --jobs=4
+          --test_output=errors
+          //:libswsscommon
+          //:libswsscommon_shared
+          //:libswsscommon_consolidated.so
+          //:swssloglevel
+          //dist:libswsscommon_pkg
+          //dist:libswsscommon_pkg.debug_symbols
+          //dist:sonic-db-cli_pkg
+          //pyext:swsscommon_pkg
+          //goext:swsscommon
+          //dist:libswsscommon_package_test
+          //tools/bazel/armhf:python_runtime_test
+          //goext:swsscommon_runtime_test
+
+      - name: Run ARMHF C++ tests through QEMU
+        run: >-
+          bazel test
+          --config=armhf
+          --//tools/bazel:yang_modules=False
+          --jobs=4
+          --test_output=errors
+          --run_under=//tools/bazel/armhf:qemu_run_under
+          //tests:status_code_util_test
+          //tests:saiaclschema_ut
+          //tests:notification_queue_ut
+          //tests:interface_ut
+          //tests:vrf_ut
+          //tests:shared_library_runtime_test
+
+      - name: Collect package artifacts
+        run: |
+          mkdir -p artifacts
+          cp \
+            bazel-bin/dist/libswsscommon_pkg.tar \
+            bazel-bin/dist/libswsscommon_pkg.debug_symbols.tar \
+            bazel-bin/dist/sonic-db-cli_pkg.tar \
+            bazel-bin/pyext/swsscommon_pkg.tar.gz \
+            artifacts/
+
+      - name: Upload package artifacts
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: sonic-swss-common-no-yang-ARMHF
           path: artifacts/
           if-no-files-found: error

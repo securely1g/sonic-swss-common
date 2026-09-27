@@ -9,7 +9,7 @@ CXXFLAGS_COMMON_BAZEL = [
     "-Wno-missing-include-dirs",
 ]
 
-# CFLAGS_COMMON from configure.ac, which is used both for C and C++
+# CFLAGS_COMMON from configure.ac, with the compiler-specific warning policy below.
 CXXFLAGS_COMMON_MAKEFILE = [
     "-ansi",
     "-fPIC",
@@ -43,7 +43,6 @@ CXXFLAGS_COMMON_MAKEFILE = [
     "-Wredundant-decls",
     "-Wshadow",
     "-Wstack-protector",
-    "-Wstrict-aliasing=3",
     "-Wswitch",
     "-Wswitch-default",
     "-Wunreachable-code",
@@ -55,7 +54,23 @@ CXXFLAGS_COMMON_MAKEFILE = [
     "-fstack-protector-strong",
 ]
 
-CXXFLAGS_COMMON = CXXFLAGS_COMMON_MAKEFILE + CXXFLAGS_COMMON_BAZEL
+# LLVM rejects GCC's numeric strict-aliasing warning level and diagnoses these
+# existing component and dependency-header patterns differently. Keep them as
+# warnings for ARMHF while retaining -Werror for every other diagnostic.
+COMPILER_WARNING_FLAGS = select({
+    "@platforms//cpu:armv7": [
+        "-Wno-error=implicit-int-conversion",
+        "-Wno-error=inconsistent-missing-override",
+        "-Wno-error=packed",
+        "-Wno-error=shorten-64-to-32",
+        "-Wno-error=string-plus-int",
+        "-Wno-error=switch-default",
+        "-Wno-error=variadic-macros",
+    ],
+    "//conditions:default": ["-Wstrict-aliasing=3"],
+}) if IS_BZLMOD else ["-Wstrict-aliasing=3"]
+
+CXXFLAGS_COMMON = CXXFLAGS_COMMON_MAKEFILE + CXXFLAGS_COMMON_BAZEL + COMPILER_WARNING_FLAGS
 
 DBGFLAGS = select({
     "@sonic_build_infra//:debug_enabled": [

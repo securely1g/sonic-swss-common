@@ -1,0 +1,92 @@
+load("@rules_distroless//distroless:defs.bzl", "flatten")
+load("@rules_shell//shell:sh_binary.bzl", "sh_binary")
+load("@rules_shell//shell:sh_test.bzl", "sh_test")
+load("@sonic_build_infra//toolchains/binutils:binutils_toolchain.bzl", "binutils_toolchain")
+
+package(default_visibility = ["//visibility:public"])
+
+platform(
+    name = "platform",
+    constraint_values = [
+        "@platforms//cpu:armv7",
+        "@platforms//os:linux",
+        "@io_bazel_rules_go//go/constraints/arm:7",
+        "@io_bazel_rules_go//go/toolchain:cgo_on",
+        "@sonic_build_infra//platforms:trixie",
+    ],
+)
+
+# The shared debug-package rules need execution tools that understand ARMHF.
+# Reuse their interface with the same LLVM distribution as the C++ toolchain.
+binutils_toolchain(
+    name = "binutils",
+    objcopy = "@armhf_llvm_llvm//:bin/llvm-objcopy",
+    objdump = "@armhf_llvm_llvm//:bin/llvm-objdump",
+    readelf = "@armhf_llvm_llvm//:bin/llvm-readelf",
+)
+
+[
+    toolchain(
+        name = "binutils_" + cpu,
+        exec_compatible_with = [
+            "@platforms//cpu:" + cpu,
+            "@platforms//os:linux",
+        ],
+        target_compatible_with = [
+            "@platforms//cpu:armv7",
+            "@platforms//os:linux",
+            "@sonic_build_infra//platforms:trixie",
+        ],
+        toolchain = ":binutils",
+        toolchain_type = "@sonic_build_infra//toolchains/binutils:toolchain_type",
+    )
+    for cpu in [
+        "x86_64",
+        "arm64",
+    ]
+]
+
+sh_binary(
+    name = "qemu_run_under",
+    testonly = True,
+    srcs = ["qemu_run_under.sh"],
+    data = [
+        ":test_runtime",
+        "@bazel_tools//tools/bash/runfiles",
+    ],
+    target_compatible_with = ["@platforms//cpu:armv7"],
+)
+
+# The target Python interpreter and distro libraries used by the runtime tests.
+# This runtime comes from the same pinned ARMHF package set as the build.
+flatten(
+    name = "test_runtime",
+    testonly = True,
+    deduplicate = True,
+    target_compatible_with = ["@platforms//cpu:armv7"],
+    tars = [
+        "@trixie//libboost-serialization-dev",
+        "@trixie//libhiredis-dev",
+        "@trixie//libyang-dev",
+        "@trixie//libzmq3-dev",
+        "@trixie//python3-dev",
+        "@trixie//uuid-dev",
+    ],
+)
+
+sh_test(
+    name = "python_runtime_test",
+    srcs = ["python_runtime_test.sh"],
+    args = [
+        "$(location :test_runtime)",
+        "$(location //pyext:swsscommon_pkg)",
+    ] + select({
+        "//tools/bazel:yang_modules_enabled": ["enabled"],
+        "//conditions:default": ["disabled"],
+    }),
+    data = [
+        ":test_runtime",
+        "//pyext:swsscommon_pkg",
+    ],
+    target_compatible_with = ["@platforms//cpu:armv7"],
+)
