@@ -20,3 +20,14 @@ buildifier(
     lint_mode = "warn",
     mode = "diff",
 )
+
+# Keep formatting in CI while the Bazel 6 compatibility code intentionally
+# retains native C++ rules that current Buildifier flags as lint warnings.
+buildifier(
+    name = "buildifier.format.check",
+    exclude_patterns = [
+        "./.git/*",
+    ],
+    lint_mode = "",
+    mode = "diff",
+)
