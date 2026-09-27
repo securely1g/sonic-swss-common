@@ -61,3 +61,24 @@ cc_test(
     linkstatic = False,
     deps = ["//:libswsscommon_shared"],
 )
+
+# Compile the no-YANG test sources from tests/Makefile.am for CodeQL. The
+# regular Bazel tests above cover a smaller set that runs without Redis.
+cc_library(
+    name = "codeql_test_sources",
+    testonly = True,
+    srcs = glob(
+        ["*.cpp"],
+        exclude = ["defaultvalueprovider_ut.cpp"],
+    ),
+    hdrs = ["logger_ut.h"],
+    copts = ["-fno-access-control"],
+    tags = ["manual"],
+    deps = [
+        "//:libswsscommon",
+        "//sonic-db-cli:sonicdbcli",
+        "@com_github_google_glog//:glog",
+        "@com_google_googletest//:gtest",
+        "@cppzmq",
+    ],
+)

@@ -104,6 +104,22 @@ The Go binding target is included in CI. Its Redis-backed integration test,
 endpoints and database configuration. Run that test separately in an environment
 providing those services; the standalone CI target list does not start Redis.
 
+## CodeQL C++ build
+
+The C++ CodeQL job builds with Bazel inside a native AMD64 Debian Trixie
+container. CodeQL observes compiler processes, so this job creates a fresh Bazel
+output base after CodeQL initialization, uses local compilation, and disables
+action caches. Bazelisk and repository download caches remain available for tools
+and dependencies.
+The build passes `--cxxopt=-nostdinc` so local C++ compilation uses the
+toolchain's explicit GCC and Debian include paths while retaining Bazel's header
+dependency checks.
+
+The build covers the library, command-line tools, and generated Python SWIG
+wrapper. The manual `//tests:codeql_test_sources` target also compiles the 48
+legacy C++ test files that the package build exposed to CodeQL, without requiring
+Redis services.
+
 ## SWIG constant wrapping
 
 SWIG 4.3 generates mutable `char *` variable wrappers for some C++

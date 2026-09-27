@@ -25,7 +25,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        language: [ 'cpp','python' ]
+        language: [ 'python' ]
 
     steps:
     - name: Checkout repository
@@ -38,46 +38,74 @@ jobs:
         config-file: ./.github/codeql/codeql-config.yml
         languages: ${{ matrix.language }}
 
-    - if: matrix.language == 'cpp'
-      name: prepare
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y libxml-simple-perl \
-            aspell \
-            aspell-en \
-            libhiredis-dev \
-            libnl-3-dev \
-            libnl-genl-3-dev \
-            libnl-route-3-dev \
-            libnl-nf-3-dev \
-            libyang-dev \
-            libzmq3-dev \
-            libzmq5 \
-            swig3.0 \
-            libpython3-dev \
-            libgtest-dev \
-            libgmock-dev \
-            libboost-dev \
-            libboost-serialization-dev \
-            dh-exec \
-            doxygen \
-            cdbs \
-            bison \
-            flex \
-            graphviz \
-            autoconf-archive \
-            uuid-dev \
-            libjansson-dev \
-            nlohmann-json3-dev
-
-    - if: matrix.language == 'cpp'
-      name: build-swss-common
-      run: |
-        set -x
-        ./autogen.sh
-        dpkg-buildpackage -rfakeroot -us -uc -b -Pnoyangmod,nopython2 -j$(nproc)
-
     - name: Perform CodeQL Analysis
       uses: github/codeql-action/analyze@ec3cf9c605b848da5f1e41e8452719eb1ccfb9a6 # v2.1.29
       with:
         category: "/language:${{matrix.language}}"
+
+  analyze-cpp:
+    name: Analyze (cpp)
+    runs-on: ubuntu-24.04
+    container:
+      image: debian:trixie-20260918
+      options: --init
+    timeout-minutes: 60
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+
+    steps:
+    - name: Install host build tools
+      run: |
+        apt-get update
+        apt-get install -y --no-install-recommends \
+          binutils build-essential ca-certificates git python3 tar
+
+    - name: Checkout repository
+      uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744 # v3
+
+    - name: Configure Git for the container checkout
+      run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
+    - uses: bazel-contrib/setup-bazel@c5acdfb288317d0b5c0bbd7a396a3dc868bb0f86 # 0.19.0
+      with:
+        bazelisk-version: 1.29.0
+        bazelisk-cache: true
+        repository-cache: true
+        cache-version: "8.5.1"
+
+    - name: Initialize CodeQL
+      uses: github/codeql-action/init@ec3cf9c605b848da5f1e41e8452719eb1ccfb9a6 # v2.1.29
+      with:
+        config-file: ./.github/codeql/codeql-config.yml
+        languages: cpp
+        # Match the CLI used by the legacy job, which supports GCC 14.2.
+        tools: https://github.com/github/codeql-action/releases/download/codeql-bundle-v2.27.0/codeql-bundle-linux64.tar.gz
+
+    - name: Build C++ with Bazel
+      shell: bash
+      run: |
+        codeql_bazel_output_base="$(mktemp -d "$RUNNER_TEMP/codeql-bazel-output.XXXXXX")"
+        trap 'bazel --output_base="$codeql_bazel_output_base" shutdown' EXIT
+        bazel --output_base="$codeql_bazel_output_base" build \
+          --//tools/bazel:yang_modules=False \
+          --spawn_strategy=local \
+          --nouse_action_cache \
+          --noremote_accept_cached \
+          --noremote_upload_local_results \
+          --disk_cache= \
+          --remote_cache= \
+          --remote_executor= \
+          --cxxopt=-nostdinc \
+          //:libswsscommon \
+          //:swssloglevel \
+          //sonic-db-cli:sonic-db-cli \
+          //pyext:_swsscommon \
+          //tests:codeql_test_sources \
+          //tests:shared_library_runtime_test
+
+    - name: Perform CodeQL Analysis
+      uses: github/codeql-action/analyze@ec3cf9c605b848da5f1e41e8452719eb1ccfb9a6 # v2.1.29
+      with:
+        category: "/language:cpp"
