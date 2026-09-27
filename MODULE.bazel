@@ -91,6 +91,9 @@ llvm.toolchain(
     name = "armhf_llvm",
     extra_compile_flags = {
         "linux-armv7": [
+            "-D_LARGEFILE_SOURCE",
+            "-D_FILE_OFFSET_BITS=64",
+            "-D_TIME_BITS=64",
             "-march=armv7-a",
             "-mfpu=vfpv3-d16",
             "-mfloat-abi=hard",

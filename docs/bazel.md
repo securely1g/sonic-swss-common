@@ -22,7 +22,9 @@ ARMHF configuration runs Bazel and SWIG on ARM64 and uses LLVM for cross
 compilation. Its target ABI is Debian `arm-linux-gnueabihf`: ARMv7-A,
 VFPv3-D16, EABI5 hard-float, and `/lib/ld-linux-armhf.so.3`. It uses the same
 Trixie glibc 2.41 and GCC 14 libstdc++/libgcc runtime packages as the shared
-toolchain inputs. Go targets `linux/arm` with GOARM 7.
+toolchain inputs. Target C/C++ compilation defines `_LARGEFILE_SOURCE`,
+`_FILE_OFFSET_BITS=64`, and `_TIME_BITS=64` to match Debian Trixie's ARMHF
+large file and time64 ABI. Go targets `linux/arm` with GOARM 7.
 
 CI uses `debian:trixie-20260918` and installs these host tools. Native package
 tests use `readelf` and `objcopy` from `binutils`, GDB, Python, and `tar`.
@@ -88,18 +90,22 @@ bazel test --config=aarch64 --//tools/bazel:yang_modules=False --test_output=err
 bazel test --config=armhf --//tools/bazel:yang_modules=False --jobs=4 --test_output=errors \
   "${outputs[@]}" "${package_tests[@]}" //tools/bazel/armhf:python_runtime_test
 
-# ARMHF C++ tests, using the scoped QEMU runner
+# ARMHF compiled tests, using the scoped QEMU runner
 bazel test --config=armhf --//tools/bazel:yang_modules=False --jobs=4 --test_output=errors \
-  --run_under=//tools/bazel/armhf:qemu_run_under "${compiled_tests[@]}"
+  --run_under=//tools/bazel/armhf:qemu_run_under "${compiled_tests[@]}" \
+  //tools/bazel/armhf:abi_runtime_test
 ```
 
 `bazel test` builds the listed libraries, binaries, bindings, and packages as
 well as running the listed tests. For ARMHF, the package inspection remains a
 host shell test. The scoped runner extracts the pinned target runtime and
-verifies that each C++ test is an ARM ELF32 hard-float binary before starting
+verifies that each compiled test is an ARM ELF32 hard-float binary before starting
 QEMU. The Go and Python host tests invoke QEMU for their target binaries. The
 Python test extracts the target runtime and package, verifies their ELF
 architecture, then imports and calls the binding using the ARMHF interpreter.
+The ARMHF ABI test checks 64-bit `off_t` and `time_t`, reads and writes beyond
+2 GiB in a sparse file, preserves post-2038 timestamps, and checks for errors
+while reading directories.
 
 CI also checks Bazel file formatting on the native jobs:
 

@@ -1,3 +1,4 @@
+load("@rules_cc//cc:cc_test.bzl", "cc_test")
 load("@rules_distroless//distroless:defs.bzl", "flatten")
 load("@rules_shell//shell:sh_binary.bzl", "sh_binary")
 load("@rules_shell//shell:sh_test.bzl", "sh_test")
@@ -54,6 +55,12 @@ sh_binary(
         ":test_runtime",
         "@bazel_tools//tools/bash/runfiles",
     ],
+    target_compatible_with = ["@platforms//cpu:armv7"],
+)
+
+cc_test(
+    name = "abi_runtime_test",
+    srcs = ["abi_runtime_test.c"],
     target_compatible_with = ["@platforms//cpu:armv7"],
 )
 

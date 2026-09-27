@@ -135,7 +135,7 @@ jobs:
           //tools/bazel/armhf:python_runtime_test
           //goext:swsscommon_runtime_test
 
-      - name: Run ARMHF C++ tests through QEMU
+      - name: Run ARMHF compiled tests through QEMU
         run: >-
           bazel test
           --config=armhf
@@ -149,6 +149,7 @@ jobs:
           //tests:interface_ut
           //tests:vrf_ut
           //tests:shared_library_runtime_test
+          //tools/bazel/armhf:abi_runtime_test
 
       - name: Collect package artifacts
         run: |
