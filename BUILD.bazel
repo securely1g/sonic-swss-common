@@ -103,6 +103,9 @@ cc_binary(
 alwayslink_cc_binary(
     name = "libswsscommon_consolidated.so",
     binary = "libswsscommon_consolidated_base",
+    # cc_import preserves this basename in consumer runfiles. It must match
+    # the ELF SONAME so the dynamic loader can find the library.
+    output_name = "libswsscommon.so.0",
 )
 
 # libswsscommon as a shared library: the headers and the distro deps, with the

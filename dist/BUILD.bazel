@@ -49,7 +49,9 @@ DIST_LOOSE_COMMON_MTREE = [
         name = "dist_loose_" + cpu,
         srcs = DIST_LOOSE_SRCS,
         mtree = [
-            "usr/lib/{}/libswsscommon.so type=file content=$(location //:libswsscommon_consolidated.so)".format(multiarch),
+            "usr/lib/{}/libswsscommon.so.0.0.0 type=file content=$(location //:libswsscommon_consolidated.so)".format(multiarch),
+            "usr/lib/{}/libswsscommon.so.0 type=link link=libswsscommon.so.0.0.0".format(multiarch),
+            "usr/lib/{}/libswsscommon.so type=link link=libswsscommon.so.0".format(multiarch),
         ] + DIST_LOOSE_COMMON_MTREE,
         target_compatible_with = ["@platforms//cpu:" + cpu],
     )
