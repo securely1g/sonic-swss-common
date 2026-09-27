@@ -1,4 +1,5 @@
 load("@rules_distroless//distroless:defs.bzl", "flatten")
+load("@rules_shell//shell:sh_test.bzl", "sh_test")
 load("@tar.bzl", "mtree_mutate", "mtree_spec", "tar")
 
 package(default_visibility = ["//visibility:public"])
@@ -76,6 +77,19 @@ flatten(
         ":dist_loose",
     ],
     visibility = ["//visibility:public"],
+)
+
+sh_test(
+    name = "libswsscommon_package_test",
+    srcs = ["libswsscommon_package_test.sh"],
+    args = [
+        "$(location :libswsscommon_pkg)",
+        "$(location //:libswsscommon_consolidated.so)",
+    ],
+    data = [
+        ":libswsscommon_pkg",
+        "//:libswsscommon_consolidated.so",
+    ],
 )
 
 tar(

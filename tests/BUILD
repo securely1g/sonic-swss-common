@@ -54,3 +54,10 @@ cc_test(
         "@com_google_googletest//:gtest_main",
     ],
 )
+
+cc_test(
+    name = "shared_library_runtime_test",
+    srcs = ["shared_library_runtime_test.c"],
+    linkstatic = False,
+    deps = ["//:libswsscommon_shared"],
+)
