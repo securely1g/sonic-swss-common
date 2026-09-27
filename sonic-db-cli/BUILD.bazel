@@ -9,6 +9,7 @@ swss_cc_library(
     srcs = ["sonic-db-cli.cpp"],
     hdrs = ["sonic-db-cli.h"],
     cxxopts = DBGFLAGS + CXXFLAGS_COMMON,
+    visibility = ["//tests:__pkg__"],
     deps = ["//:libswsscommon"],
 )
 
