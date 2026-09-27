@@ -60,7 +60,7 @@ cd sonic-swss-common
 ```
 
 Use a native AMD64 or ARM64 Linux environment with Debian Trixie userspace.
-The standalone Bazel build currently supports the no-YANG configuration.
+The standalone Bazel build supports YANG enabled (the default) and disabled.
 Install [Bazelisk](https://bazel.build/install/bazelisk) as `bazel`;
 `.bazelversion` selects Bazel 8.5.1. Bazel downloads the native compiler
 toolchain and library dependencies.
@@ -77,33 +77,40 @@ From the repository root, build the C++ shared library and package archives:
 
 ```sh
 # Native AMD64
-bazel build --//tools/bazel:yang_modules=False \
+bazel build --//tools/bazel:yang_modules=True \
   //:libswsscommon_shared \
   //dist:libswsscommon_pkg \
   //dist:libswsscommon_pkg.debug_symbols \
   //dist:sonic-db-cli_pkg \
-  //pyext:swsscommon_pkg
+  //pyext:swsscommon_pkg \
+  //tools/bazel/yang:yang_models_dependency_pkg
 ```
 
 For native ARM64, add `--config=aarch64` after `build`. The package archives
 are written to `bazel-bin/dist/libswsscommon_pkg.tar`,
 `bazel-bin/dist/libswsscommon_pkg.debug_symbols.tar`,
 `bazel-bin/dist/sonic-db-cli_pkg.tar`, and
-`bazel-bin/pyext/swsscommon_pkg.tar.gz`.
+`bazel-bin/pyext/swsscommon_pkg.tar.gz`. The enabled build also writes
+`bazel-bin/tools/bazel/yang/yang_models_dependency_pkg.tar`; install this model
+payload with the runtime archive, as described in the build guide. To build
+without YANG, pass `--//tools/bazel:yang_modules=False` and omit the model
+package target.
 
 The runtime package contains the library and `swssloglevel` with their debug
 information removed. The matching detached information is in
 `libswsscommon_pkg.debug_symbols.tar`, derived from the same linked files.
 
 To keep source-level debug information embedded in the raw shared library,
-build it with explicit compiler and strip settings:
+build it with explicit compiler and strip settings. These flags work with either
+YANG mode:
 
 ```sh
-bazel build --copt=-g --strip=never --//tools/bazel:yang_modules=False \
+bazel build --copt=-g --strip=never \
   //:libswsscommon_consolidated.so
 ```
 
-Add `--config=aarch64` for native ARM64. The symbols are embedded in
+Add `--//tools/bazel:yang_modules=False` for disabled mode and
+`--config=aarch64` for native ARM64. The symbols are embedded in
 `bazel-bin/libswsscommon_consolidated.so/libswsscommon.so.0`. The current
 compiler toolchain needs `--copt=-g`; selecting `-c dbg` alone does not add
 debug information.

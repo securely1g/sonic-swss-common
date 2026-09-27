@@ -20,12 +20,16 @@ _APT_DEPS = [
     "@libnl3//:libnl_3",
     "@libnl3//:libnl_route_3",
     "@libnl3//:libnl_nf_3",
-    "@trixie//libyang-dev:libyang",
     "@trixie//libzmq3-dev:libzmq3",
     "@trixie//uuid-dev:uuid",
     "@trixie//libboost-dev:libboost",
     "@trixie//libboost-serialization-dev:libboost-serialization",
 ]
+
+_YANG_APT_DEPS = select({
+    "//tools/bazel:yang_modules_enabled": ["@trixie//libyang-dev:libyang"],
+    "//conditions:default": [],
+})
 
 # Legacy ambient dependencies, for WORKSPACE.
 
@@ -49,7 +53,7 @@ _SYSTEM_LINKOPTS = [
     "//conditions:default": [],
 })
 
-SWSS_COMMON_DEPS = _APT_DEPS if IS_BZLMOD else []
+SWSS_COMMON_DEPS = _APT_DEPS + _YANG_APT_DEPS if IS_BZLMOD else []
 
 SWSS_COMMON_COPTS = [] if IS_BZLMOD else _SYSTEM_COPTS
 

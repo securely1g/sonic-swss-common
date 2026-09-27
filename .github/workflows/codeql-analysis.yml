@@ -89,7 +89,7 @@ jobs:
         codeql_bazel_output_base="$(mktemp -d "$RUNNER_TEMP/codeql-bazel-output.XXXXXX")"
         trap 'bazel --output_base="$codeql_bazel_output_base" shutdown' EXIT
         bazel --output_base="$codeql_bazel_output_base" build \
-          --//tools/bazel:yang_modules=False \
+          --//tools/bazel:yang_modules=True \
           --spawn_strategy=local \
           --nouse_action_cache \
           --noremote_accept_cached \

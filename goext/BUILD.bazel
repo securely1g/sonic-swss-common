@@ -36,16 +36,9 @@ cc_library(
     # Strip the "common/" path prefix so CGO can #include "dbconnector.h" etc.
     strip_include_prefix = "/common",
     visibility = ["//visibility:public"],
-    deps = [
-        "@libnl3//:libnl_3",
-        "@libnl3//:libnl_nf_3",
-        "@libnl3//:libnl_route_3",
-        "@trixie//libboost-dev:libboost",
-        "@trixie//libboost-serialization-dev:libboost-serialization",
-        "@trixie//libhiredis-dev:libhiredis",
-        "@trixie//libzmq3-dev:libzmq3",
-        "@trixie//uuid-dev:uuid",
-    ],
+    # Keep native link dependencies aligned with :common, including libyang
+    # when the feature is enabled.
+    deps = ["//:common_deps"],
 )
 
 # Compile the SWIG-generated C++ wrapper as a cc_library so that transitive
@@ -80,6 +73,33 @@ go_library(
     clinkopts = ["-fuse-ld=bfd"],
     importpath = "github.com/sonic-net/sonic-swss-common/goext",
     visibility = ["//visibility:public"],
+)
+
+go_test(
+    name = "swsscommon_runtime_test_binary",
+    srcs = ["swsscommon_runtime_test.go"],
+    embed = [":swsscommon"],
+    tags = ["manual"],
+)
+
+# rules_go's interface-library handling does not add all versioned distro
+# libraries to runfiles. Exercise the consumer with declared Trixie runtime
+# dependencies, matching the installed environment used by SONiC.
+sh_test(
+    name = "swsscommon_runtime_test",
+    srcs = ["//tools/bazel/runtime:run_with_runtime.py"],
+    args = [
+        "$(location //tools/bazel/runtime:test_runtime)",
+        "$(location //:libswsscommon_consolidated.so)",
+    ] + select({
+        "//tools/bazel:yang_modules_enabled": ["enabled"],
+        "//conditions:default": ["disabled"],
+    }) + ["$(location :swsscommon_runtime_test_binary)"],
+    data = [
+        ":swsscommon_runtime_test_binary",
+        "//:libswsscommon_consolidated.so",
+        "//tools/bazel/runtime:test_runtime",
+    ],
 )
 
 go_test(

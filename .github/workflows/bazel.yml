@@ -46,6 +46,47 @@ jobs:
       - name: Check Bazel formatting
         run: bazel run ${{ matrix.bazel_args }} //tools/bazel/buildifier:buildifier.format.check
 
+      - name: Build and test with YANG
+        run: >-
+          bazel test
+          ${{ matrix.bazel_args }}
+          --//tools/bazel:yang_modules=True
+          --test_output=errors
+          //common:cfg_schema_generated
+          //:libswsscommon
+          //:libswsscommon_shared
+          //:libswsscommon_consolidated.so
+          //:swssloglevel
+          //dist:libswsscommon_pkg
+          //dist:libswsscommon_pkg.debug_symbols
+          //dist:sonic-db-cli_pkg
+          //pyext:swsscommon_pkg
+          //tools/bazel/yang:yang_models_dependency_pkg
+          //goext:swsscommon
+          //goext:swsscommon_runtime_test
+          //tests:status_code_util_test
+          //tests:saiaclschema_ut
+          //tests:notification_queue_ut
+          //tests:interface_ut
+          //tests:vrf_ut
+          //tests:shared_library_runtime_test
+          //tests:defaultvalueprovider_ut
+          //dist:libswsscommon_package_test
+          //pyext:swsscommon_package_test
+          //tools/bazel/yang:yang_models_dependency_package_test
+          //tools/bazel/yang:libyang_runtime_test
+
+      - name: Collect YANG package artifacts
+        run: |
+          mkdir -p artifacts/yang
+          cp \
+            bazel-bin/dist/libswsscommon_pkg.tar \
+            bazel-bin/dist/libswsscommon_pkg.debug_symbols.tar \
+            bazel-bin/dist/sonic-db-cli_pkg.tar \
+            bazel-bin/pyext/swsscommon_pkg.tar.gz \
+            bazel-bin/tools/bazel/yang/yang_models_dependency_pkg.tar \
+            artifacts/yang/
+
       - name: Build and test without YANG
         run: >-
           bazel test
@@ -61,6 +102,7 @@ jobs:
           //dist:sonic-db-cli_pkg
           //pyext:swsscommon_pkg
           //goext:swsscommon
+          //goext:swsscommon_runtime_test
           //tests:status_code_util_test
           //tests:saiaclschema_ut
           //tests:notification_queue_ut
@@ -68,20 +110,28 @@ jobs:
           //tests:vrf_ut
           //tests:shared_library_runtime_test
           //dist:libswsscommon_package_test
+          //pyext:swsscommon_package_test
 
-      - name: Collect package artifacts
+      - name: Collect no-YANG package artifacts
         run: |
-          mkdir -p artifacts
+          mkdir -p artifacts/no-yang
           cp \
             bazel-bin/dist/libswsscommon_pkg.tar \
             bazel-bin/dist/libswsscommon_pkg.debug_symbols.tar \
             bazel-bin/dist/sonic-db-cli_pkg.tar \
             bazel-bin/pyext/swsscommon_pkg.tar.gz \
-            artifacts/
+            artifacts/no-yang/
 
-      - name: Upload package artifacts
+      - name: Upload YANG package artifacts
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: sonic-swss-common-yang-${{ matrix.arch }}
+          path: artifacts/yang/
+          if-no-files-found: error
+
+      - name: Upload no-YANG package artifacts
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: sonic-swss-common-no-yang-${{ matrix.arch }}
-          path: artifacts/
+          path: artifacts/no-yang/
           if-no-files-found: error

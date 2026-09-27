@@ -1,0 +1,34 @@
+load("@rules_python//python:py_library.bzl", "py_library")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files([
+    "src/libyang3-py3/patch/0001-debian.patch",
+    "src/libyang3-py3/patch/0002-pr134-json-string-datatypes.patch",
+    "src/libyang3-py3/patch/0003-pr132-backlinks.patch",
+    "src/libyang3-py3/patch/0004-pr141-test-crash.patch",
+    "src/sonic-yang-models/README.rst",
+    "src/sonic-yang-models/setup.py",
+])
+
+filegroup(
+    name = "yang_model_sources",
+    srcs = glob([
+        "src/sonic-yang-models/yang-models/*.yang",
+        "src/sonic-yang-models/yang-templates/*.yang.j2",
+    ]),
+)
+
+py_library(
+    name = "sonic_yang_mgmt",
+    srcs = [
+        "src/sonic-yang-mgmt/sonic_yang.py",
+        "src/sonic-yang-mgmt/sonic_yang_ext.py",
+        "src/sonic-yang-mgmt/sonic_yang_path.py",
+    ],
+    imports = ["src/sonic-yang-mgmt"],
+    deps = [
+        "@swss_libyang_python//:libyang",
+        "@swss_yang_pip//jsonpointer",
+    ],
+)

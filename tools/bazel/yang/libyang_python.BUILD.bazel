@@ -1,0 +1,43 @@
+load("@rules_cc//cc:cc_binary.bzl", "cc_binary")
+load("@rules_python//python:py_library.bzl", "py_library")
+
+package(default_visibility = ["//visibility:public"])
+
+genrule(
+    name = "cffi_c",
+    srcs = [
+        "cffi/build.py",
+        "cffi/cdefs.h",
+        "cffi/source.c",
+    ],
+    outs = ["_libyang.c"],
+    cmd = "$(execpath @sonic-swss-common//tools/bazel/yang:emit_cffi) --build $(execpath cffi/build.py) --output $@",
+    tags = ["block-network"],
+    tools = ["@sonic-swss-common//tools/bazel/yang:emit_cffi"],
+)
+
+cc_binary(
+    name = "_libyang.so",
+    srcs = [":cffi_c"],
+    copts = ["-std=c99"],
+    features = ["-sonic_installed_runtime_paths"],
+    linkopts = [
+        "-Wl,-z,now",
+        # Imported libyang has no runpath. Keep Bazel's library paths transitive
+        # so its libxxhash dependency also resolves from declared runfiles.
+        "-Wl,--disable-new-dtags",
+    ],
+    linkshared = True,
+    deps = [
+        "@rules_python//python/cc:current_py_cc_headers",
+        "@sonic-swss-common//tools/bazel/yang:libyang_execution_deps",
+    ],
+)
+
+py_library(
+    name = "libyang",
+    srcs = glob(["libyang/*.py"]),
+    data = [":_libyang.so"],
+    imports = ["."],
+    deps = ["@swss_yang_pip//cffi"],
+)

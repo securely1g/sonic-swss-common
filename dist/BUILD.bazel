@@ -104,7 +104,10 @@ sh_test(
     args = [
         "$(location :libswsscommon_pkg)",
         "$(location :libswsscommon_pkg.debug_symbols)",
-    ],
+    ] + select({
+        "//tools/bazel:yang_modules_enabled": ["enabled"],
+        "//conditions:default": ["disabled"],
+    }),
     data = [
         ":libswsscommon_pkg",
         ":libswsscommon_pkg.debug_symbols",
