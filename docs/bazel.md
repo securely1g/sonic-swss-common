@@ -33,8 +33,16 @@ apt-get install -y --no-install-recommends \
   binutils build-essential ca-certificates gdb git python3 tar
 ```
 
-The ARMHF job also installs `gdb-multiarch` and `qemu-user`. Its package test
-uses the pinned LLVM `objcopy` and `gdb-multiarch` to inspect ARM binaries.
+For the ARMHF configuration on ARM64, also install the execution and inspection
+dependencies:
+
+```sh
+apt-get install -y --no-install-recommends gdb-multiarch libxml2 qemu-user
+```
+
+The downloaded ARM64 LLVM linker requires `libxml2.so.2` from the host's
+`libxml2` package. The package test uses the pinned LLVM `objcopy` and
+`gdb-multiarch` to inspect ARM binaries.
 QEMU executes the target C++, Go, and Python binaries while Bazel and build
 tools continue to run on the ARM64 host.
 
