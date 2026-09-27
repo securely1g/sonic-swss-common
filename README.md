@@ -50,6 +50,61 @@ You can also build a debian package using:
     ./configure
     dpkg-buildpackage -us -uc -b
 
+### Build with Bazel
+
+Clone the fork containing the standalone Bazel build:
+
+```sh
+git clone --recursive https://github.com/securely1g/sonic-swss-common.git
+cd sonic-swss-common
+```
+
+Use a native AMD64 or ARM64 Linux environment with Debian Trixie userspace.
+The standalone Bazel build currently supports the no-YANG configuration.
+Install [Bazelisk](https://bazel.build/install/bazelisk) as `bazel`;
+`.bazelversion` selects Bazel 8.5.1. Bazel downloads the native compiler
+toolchain and library dependencies.
+
+Install the host build tools:
+
+```sh
+sudo apt-get update
+sudo apt-get install -y --no-install-recommends \
+  binutils build-essential ca-certificates git python3 tar
+```
+
+From the repository root, build the C++ shared library and package archives:
+
+```sh
+# Native AMD64
+bazel build --//tools/bazel:yang_modules=False \
+  //:libswsscommon_shared \
+  //dist:libswsscommon_pkg \
+  //dist:sonic-db-cli_pkg \
+  //pyext:swsscommon_pkg
+```
+
+For native ARM64, add `--config=aarch64` after `build`. The package archives
+are written to `bazel-bin/dist/libswsscommon_pkg.tar`,
+`bazel-bin/dist/sonic-db-cli_pkg.tar`, and
+`bazel-bin/pyext/swsscommon_pkg.tar.gz`.
+
+To include source-level debug symbols in the shared library, build with
+explicit compiler debug information and keep it in the output:
+
+```sh
+bazel build --copt=-g --strip=never --//tools/bazel:yang_modules=False \
+  //:libswsscommon_consolidated.so //dist:libswsscommon_pkg
+```
+
+Add `--config=aarch64` for native ARM64. The symbols are embedded in
+`bazel-bin/libswsscommon_consolidated.so/libswsscommon.so.0` and the library
+inside `bazel-bin/dist/libswsscommon_pkg.tar`. The current compiler toolchain
+needs `--copt=-g`; selecting `-c dbg` alone does not add debug information.
+
+See the [Bazel build guide](docs/bazel.md) for the complete build and test
+commands, Go bindings, supported configuration, and GitHub Actions artifacts.
+
 ### Build with Google Test
 1. Rebuild with Google Test
 ```
