@@ -24,7 +24,7 @@ def _transitioned_cc_binary_impl(ctx):
 
     original_file = files[0]
 
-    new_file_name = original_file.basename
+    new_file_name = ctx.attr.output_name or original_file.basename
     new_file = ctx.actions.declare_file(paths.join(ctx.label.name, new_file_name))
 
     ctx.actions.run_shell(
@@ -57,6 +57,9 @@ This is a temporary rule, which should go away as soon as we have a `cc_shared_l
     attrs = {
         "binary": attr.label(
             cfg = alwayslink_transition,
+        ),
+        "output_name": attr.string(
+            doc = "Filename exposed to consumers; defaults to the binary's basename.",
         ),
         # TODO(bazel-ready): Remove this attribute when we can stop supporting Bazel 6.
         #   Ref: https://github.com/bazelbuild/bazel/commit/bb7fb2d32f055f2a70a5ab394cf5aef29bc74b2e
