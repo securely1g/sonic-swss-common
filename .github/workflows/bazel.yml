@@ -31,7 +31,7 @@ jobs:
         run: |
           apt-get update
           apt-get install -y --no-install-recommends \
-            binutils build-essential ca-certificates git python3 tar
+            binutils build-essential ca-certificates gdb git python3 tar
 
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -57,6 +57,7 @@ jobs:
           //:libswsscommon_consolidated.so
           //:swssloglevel
           //dist:libswsscommon_pkg
+          //dist:libswsscommon_pkg.debug_symbols
           //dist:sonic-db-cli_pkg
           //pyext:swsscommon_pkg
           //goext:swsscommon
@@ -73,6 +74,7 @@ jobs:
           mkdir -p artifacts
           cp \
             bazel-bin/dist/libswsscommon_pkg.tar \
+            bazel-bin/dist/libswsscommon_pkg.debug_symbols.tar \
             bazel-bin/dist/sonic-db-cli_pkg.tar \
             bazel-bin/pyext/swsscommon_pkg.tar.gz \
             artifacts/

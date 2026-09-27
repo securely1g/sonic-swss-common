@@ -172,6 +172,11 @@ alias(
 )
 
 alias(
+    name = "libswsscommon_pkg.debug_symbols",
+    actual = "//dist:libswsscommon_pkg.debug_symbols",
+)
+
+alias(
     name = "sonic-db-cli_pkg",
     actual = "//dist:sonic-db-cli_pkg",
 )

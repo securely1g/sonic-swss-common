@@ -80,27 +80,33 @@ From the repository root, build the C++ shared library and package archives:
 bazel build --//tools/bazel:yang_modules=False \
   //:libswsscommon_shared \
   //dist:libswsscommon_pkg \
+  //dist:libswsscommon_pkg.debug_symbols \
   //dist:sonic-db-cli_pkg \
   //pyext:swsscommon_pkg
 ```
 
 For native ARM64, add `--config=aarch64` after `build`. The package archives
 are written to `bazel-bin/dist/libswsscommon_pkg.tar`,
+`bazel-bin/dist/libswsscommon_pkg.debug_symbols.tar`,
 `bazel-bin/dist/sonic-db-cli_pkg.tar`, and
 `bazel-bin/pyext/swsscommon_pkg.tar.gz`.
 
-To include source-level debug symbols in the shared library, build with
-explicit compiler debug information and keep it in the output:
+The runtime package contains the library and `swssloglevel` with their debug
+information removed. The matching detached information is in
+`libswsscommon_pkg.debug_symbols.tar`, derived from the same linked files.
+
+To keep source-level debug information embedded in the raw shared library,
+build it with explicit compiler and strip settings:
 
 ```sh
 bazel build --copt=-g --strip=never --//tools/bazel:yang_modules=False \
-  //:libswsscommon_consolidated.so //dist:libswsscommon_pkg
+  //:libswsscommon_consolidated.so
 ```
 
 Add `--config=aarch64` for native ARM64. The symbols are embedded in
-`bazel-bin/libswsscommon_consolidated.so/libswsscommon.so.0` and the library
-inside `bazel-bin/dist/libswsscommon_pkg.tar`. The current compiler toolchain
-needs `--copt=-g`; selecting `-c dbg` alone does not add debug information.
+`bazel-bin/libswsscommon_consolidated.so/libswsscommon.so.0`. The current
+compiler toolchain needs `--copt=-g`; selecting `-c dbg` alone does not add
+debug information.
 
 See the [Bazel build guide](docs/bazel.md) for the complete build and test
 commands, Go bindings, supported configuration, and GitHub Actions artifacts.
@@ -171,4 +177,3 @@ For example:
 * Push your changes to your private fork and do "pull-request" to this repository
 * Use a pull request to do code review
 * Use issues to keep track of what is going on
-

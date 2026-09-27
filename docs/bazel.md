@@ -15,12 +15,12 @@ against Trixie's glibc 2.41, so CI runs inside a Trixie container on each native
 GitHub-hosted runner.
 
 CI uses `debian:trixie-20260918` and installs these host tools. The package test
-uses `readelf` from `binutils` and `tar`.
+uses `readelf` and `objcopy` from `binutils`, GDB, Python, and `tar`.
 
 ```sh
 apt-get update
 apt-get install -y --no-install-recommends \
-  binutils build-essential ca-certificates git python3 tar
+  binutils build-essential ca-certificates gdb git python3 tar
 ```
 
 ## Build and test
@@ -37,6 +37,7 @@ targets=(
   //:libswsscommon_consolidated.so
   //:swssloglevel
   //dist:libswsscommon_pkg
+  //dist:libswsscommon_pkg.debug_symbols
   //dist:sonic-db-cli_pkg
   //pyext:swsscommon_pkg
   //goext:swsscommon
@@ -80,15 +81,45 @@ artifact for your architecture from the **Artifacts** section:
 - `sonic-swss-common-no-yang-AMD64`
 - `sonic-swss-common-no-yang-ARM64`
 
-Each download contains these three archives:
+Each download contains these four archives:
 
 - `libswsscommon_pkg.tar`: C++ runtime library, `swssloglevel`, Lua files, and
   database configuration.
+- `libswsscommon_pkg.debug_symbols.tar`: detached debug information for the
+  runtime library and `swssloglevel` in `libswsscommon_pkg.tar`.
 - `sonic-db-cli_pkg.tar`: database CLI.
 - `swsscommon_pkg.tar.gz`: Python bindings.
 
 These are native Debian Trixie builds using the no-YANG configuration described
 below. GitHub requires you to sign in to download workflow artifacts.
+
+## Debug symbols
+
+Build the runtime package and its matching detached symbols together:
+
+```sh
+bazel build --//tools/bazel:yang_modules=False \
+  //dist:libswsscommon_pkg //dist:libswsscommon_pkg.debug_symbols
+```
+
+Add `--config=aarch64` on native ARM64. Packaging uses `sonic_deploy_tar` with
+`force_debug_build = True`, which applies `--copt=-g`, `--strip=never`, and a
+linker build ID to the package inputs while retaining the selected compilation
+mode and optimization settings. It derives the runtime copy and detached debug
+file from the same linked ELF. The runtime package has its DWARF sections removed;
+the separate archive stores them under `/usr/lib/debug/.build-id/`.
+
+The package test validates the library filename, SONAME, symlinks, build IDs,
+debug-link checksums, and GDB source-line lookup. It checks both the library and
+`swssloglevel` for detached debug information. The symbol archive covers these
+two files; the CLI and Python package archives have their own packaging paths.
+
+The direct targets `//:libswsscommon`, `//:libswsscommon_shared`, and
+`//:libswsscommon_consolidated.so` continue to use the caller's compilation
+settings. To build the raw shared library with embedded debug information, use
+`--copt=-g --strip=never`. The package targets apply their debug settings through
+the deployment transition, so those flags are unnecessary for the package command
+above.
 
 ## Supported configuration
 

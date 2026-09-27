@@ -1,5 +1,7 @@
+load("@bazel_skylib//rules:copy_file.bzl", "copy_file")
 load("@rules_distroless//distroless:defs.bzl", "flatten")
 load("@rules_shell//shell:sh_test.bzl", "sh_test")
+load("@sonic_build_infra//tar:sonic_deploy_tar.bzl", "sonic_deploy_tar")
 load("@tar.bzl", "mtree_mutate", "mtree_spec", "tar")
 
 package(default_visibility = ["//visibility:public"])
@@ -31,30 +33,32 @@ tar(
 
 # Loose files: shared library, config, and binaries.
 #
-# The library lands in a multiarch directory, and tar()'s mtree attribute must be a
-# literal list rather than a select(). So we declare one tar per architecture and
-# select between them in the :dist_loose alias below.
+# The library lands in a multiarch directory, and sonic_deploy_tar's mtree and
+# binaries attributes must be literal values rather than select(). Declare one
+# deploy tar per architecture and select between them below.
 DIST_LOOSE_SRCS = [
-    "//:libswsscommon_consolidated.so",
     "//common:database_config.json",
-    "//:swssloglevel",
 ]
 
 DIST_LOOSE_COMMON_MTREE = [
     "var/run/redis/sonic-db/database_config.json type=file content=$(location //common:database_config.json)",
-    "usr/bin/swssloglevel type=file mode=0755 content=$(location //:swssloglevel)",
 ]
 
 [
-    tar(
+    sonic_deploy_tar(
         name = "dist_loose_" + cpu,
         srcs = DIST_LOOSE_SRCS,
+        binaries = {
+            "usr/lib/{}/libswsscommon.so.0.0.0 type=file mode=0555".format(multiarch): "//:libswsscommon_consolidated.so",
+            "usr/bin/swssloglevel type=file mode=0755": "//:swssloglevel",
+        },
+        force_debug_build = True,
         mtree = [
-            "usr/lib/{}/libswsscommon.so.0.0.0 type=file content=$(location //:libswsscommon_consolidated.so)".format(multiarch),
             "usr/lib/{}/libswsscommon.so.0 type=link link=libswsscommon.so.0.0.0".format(multiarch),
             "usr/lib/{}/libswsscommon.so type=link link=libswsscommon.so.0".format(multiarch),
         ] + DIST_LOOSE_COMMON_MTREE,
         target_compatible_with = ["@platforms//cpu:" + cpu],
+        visibility = ["//visibility:public"],
     )
     for cpu, multiarch in [
         ("x86_64", "x86_64-linux-gnu"),
@@ -70,6 +74,14 @@ alias(
     }),
 )
 
+alias(
+    name = "dist_loose.debug_symbols",
+    actual = select({
+        "@platforms//cpu:x86_64": ":dist_loose_x86_64.debug_symbols",
+        "@platforms//cpu:arm64": ":dist_loose_arm64.debug_symbols",
+    }),
+)
+
 flatten(
     name = "libswsscommon_pkg",
     tars = [
@@ -79,16 +91,23 @@ flatten(
     visibility = ["//visibility:public"],
 )
 
+copy_file(
+    name = "libswsscommon_pkg.debug_symbols",
+    src = ":dist_loose.debug_symbols",
+    out = "libswsscommon_pkg.debug_symbols.tar",
+    allow_symlink = False,
+)
+
 sh_test(
     name = "libswsscommon_package_test",
     srcs = ["libswsscommon_package_test.sh"],
     args = [
         "$(location :libswsscommon_pkg)",
-        "$(location //:libswsscommon_consolidated.so)",
+        "$(location :libswsscommon_pkg.debug_symbols)",
     ],
     data = [
         ":libswsscommon_pkg",
-        "//:libswsscommon_consolidated.so",
+        ":libswsscommon_pkg.debug_symbols",
     ],
 )
 
