@@ -16,9 +16,8 @@ swig_lib_deb(
 
 exports_files(["swsscommon.i"])
 
-# The shared SWIG rule does not yet expose preprocessor options. Keep the
-# feature define in a declared interface adapter, with the source interface
-# also passed as a header input to the SWIG action below.
+# Pass the feature define through a declared interface adapter. The source
+# interface is also a header input to the SWIG action below.
 swig_interface(
     name = "swsscommon_bazel_interface",
     out = "swsscommon_bazel.i",

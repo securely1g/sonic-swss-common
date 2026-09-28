@@ -16,7 +16,7 @@ standalone Bazel 8 build. The public build option and header override remain in
   patches as the production
   [`src/libyang3-py3/Makefile`](https://github.com/securely1g/sonic-buildimage/blob/9ab452d22773c41783092ae3bd6c206d6c257c8d/src/libyang3-py3/Makefile)
   and owns CFFI source generation, the Python library, and binding tests. Its
-  [module README](https://github.com/securely1g/sonic-bazel-registry/blob/2a44eca5ae4437528bc5862589839b7b3724b8e0/modules/libyang-python/3.1.0-sonic.1/README.md)
+  [module README](https://github.com/securely1g/sonic-bazel-registry/blob/7ce1bd20733e6c337883fc74d9057fd8cab79c34/modules/libyang-python/3.1.0-sonic.1/README.md)
   records patch provenance and strict patch application.
 - The shared SONiC Bazel registry supplies source-built `libyang` module
   `3.12.2.sonic.1`. It compiles libyang `3.12.2` with the production
@@ -51,26 +51,23 @@ keeps schema generation independent of the target CPU.
 
 The registry binding uses `current_py_cc_headers` from the selected Python
 toolchain. It resolves Python symbols from that interpreter and has no dynamic
-dependency on a second Python runtime. Its private CFFI extension disables the
-shared `sonic_installed_runtime_paths` feature so the loader uses declared Bazel
-runfiles. The pinned infrastructure revision keeps those installed filesystem
-paths enabled by default for target outputs. The module runtime test checks the
-loaded extension, CFFI backend, and native libyang against the declared runfiles;
-the upstream binding suite covers its schema and data APIs. PCRE2 and xxHash are
-static implementation dependencies, so they do not need separate shared-library
-runfiles. The deployed swsscommon Python package keeps its target-platform
-Python dependency.
+dependency on a second Python runtime. The pinned infrastructure revision does
+not add `/lib/<multiarch>` or `/usr/lib/<multiarch>/gconv` to runtime search
+paths. The private CFFI extension uses declared Bazel runfiles without a feature
+override. The module runtime test checks the loaded extension, CFFI backend, and
+native libyang against the declared runfiles. The upstream binding suite covers
+its schema and data APIs. PCRE2 and xxHash are static implementation
+dependencies, so they do not need separate shared-library runfiles. The deployed
+swsscommon Python package keeps its target-platform Python dependency.
 
 The actions pass an offline package-installer environment and request network
 blocking. Python dependencies and the CFFI source generator are declared Bazel
 tools; model and template files are declared action inputs. The source archives
 and locked Python wheels are downloaded during dependency resolution.
 
-The shared SWIG rule at the pinned infrastructure revision has no preprocessor
-options attribute. `../swig.bzl` provides a small declared interface adapter
-for the feature define. The original interface is also an explicit SWIG input.
-The adapter supports defines and undefines so a caller can select architecture
-preprocessor settings when the shared rule still supplies a default.
+`../swig.bzl` supplies a declared interface adapter for the YANG feature define.
+The SWIG action also declares the original interface as an input. The adapter
+supports defines and undefines for preprocessor settings.
 
 ## Runtime model dependency
 
