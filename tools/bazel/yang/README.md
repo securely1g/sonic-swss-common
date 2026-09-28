@@ -12,14 +12,14 @@ standalone Bazel 8 build. The public build option and header override remain in
   `securely1g/sonic-buildimage` revision
   [`9ab452d22773c41783092ae3bd6c206d6c257c8d`](https://github.com/securely1g/sonic-buildimage/tree/9ab452d22773c41783092ae3bd6c206d6c257c8d).
 - The shared SONiC Bazel registry supplies `libyang-python` module
-  `3.1.0-sonic.2`. It builds CESNET/libyang-python `v3.1.0` with the same four
+  `3.1.0-sonic.3`. It builds CESNET/libyang-python `v3.1.0` with the same four
   patches as the production
   [`src/libyang3-py3/Makefile`](https://github.com/securely1g/sonic-buildimage/blob/9ab452d22773c41783092ae3bd6c206d6c257c8d/src/libyang3-py3/Makefile)
   and owns CFFI source generation, the Python library, and binding tests. Its
-  [module README](https://github.com/securely1g/sonic-bazel-registry/blob/367c36162e75f55167d1875dc9c7bdab47bf2c1b/modules/libyang-python/3.1.0-sonic.2/README.md)
+  [module README](https://github.com/securely1g/sonic-bazel-registry/blob/be519992c1725c6e8ae2ad4b88ae5c1f09dc25b1/modules/libyang-python/3.1.0-sonic.3/README.md)
   records patch provenance and strict patch application. This revision selects
-  the native-only build infrastructure; the binding source and production
-  patches are unchanged.
+  the native CPU hardening fix; the binding source and production patches
+  are unchanged.
 - The shared SONiC Bazel registry supplies source-built `libyang` module
   `3.12.2.sonic.1`. It compiles libyang `3.12.2` with the production
   `LYD_VALIDATE_NOEXTDEPS` patch from that same buildimage revision and enables
