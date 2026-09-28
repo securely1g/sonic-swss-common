@@ -23,7 +23,7 @@ bazel_dep(name = "platforms", version = "1.1.0")
 bazel_dep(name = "tar.bzl", version = "0.10.5")
 bazel_dep(name = "rules_distroless", version = "0.9.4.sonic.2")
 bazel_dep(name = "libnl3", version = "3.7.0.sonic-buildimage")
-bazel_dep(name = "sonic-build-infra", version = "0.0.4-83b4e9d963f7f268d06983a8c954fc5d6d93ce2b", repo_name = "sonic_build_infra")
+bazel_dep(name = "sonic-build-infra", version = "0.0.7-91fe8246519f99838da936eee54e85208c704a4d", repo_name = "sonic_build_infra")
 bazel_dep(name = "swig", version = "4.3.0.bcr.2")
 bazel_dep(name = "toolchains_llvm", version = "1.10.0")
 
@@ -64,7 +64,7 @@ use_repo(
 # The shared GCC release has native AMD64 and ARM64 toolchains. Use the
 # published LLVM cross toolchain with the same Trixie C/C++ runtime inputs for
 # ARMHF until the shared toolchain includes this execution/target pair.
-armhf_sysroot = use_repo_rule("//tools/bazel/armhf:repositories.bzl", "armhf_sysroot")
+armhf_sysroot = use_repo_rule("@sonic_build_infra//sysroot:repositories.bzl", "debian_sysroot")
 
 armhf_sysroot(
     name = "armhf_sysroot",

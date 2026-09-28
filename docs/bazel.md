@@ -200,17 +200,22 @@ standalone CI target list does not start Redis.
 The ARMHF setup is for the standalone Bazel 8.5.1 entry point. `MODULE.bazel`
 adds ARMHF to the shared pinned Trixie package sources, selects the cumulative
 `rules_distroless` `0.9.4.sonic.2` release from the pinned securely1g registry,
-and assembles the shared sysroot package
-archives into the directory LLVM expects. The published shared GCC toolchains
+and passes explicit package archives to build-infra's `debian_sysroot` assembler
+to form the directory LLVM expects. The published shared GCC toolchains
 currently cover native AMD64 and ARM64, so ARMHF uses LLVM while retaining the
 Debian GCC 14 runtime libraries. The ARMHF configuration registers the pinned
 LLVM inspection tools with the existing binutils toolchain interface so the
 same debug-package rule can split ARM binaries.
 
-`tools/bazel/armhf/swig.bzl` supplies the ARMHF binding action. It uses the same
-pinned host SWIG and current header inputs as the shared generator, omits
-`SWIGWORDSIZE64`, and uses `-intgosize 32` for Go. The native generator calls
-keep their existing API, including WORKSPACE and local infra override use.
+`sonic-build-infra` owns both native and ARMHF SWIG actions. The ARMHF calls
+select `wordsize = 32`, omit `SWIGWORDSIZE64`, and use `-intgosize 32` for Go;
+the Python call retains its YANG feature definitions. Common owns its binding
+interfaces, output paths, packaging, and runtime tests. Its small
+`tools/bazel/armhf/swig.bzl` adapter only declares the shared 32-bit generators
+in Bzlmod builds and selects their outputs. The native calls retain the default
+64-bit behavior, and WORKSPACE builds still skip the ARMHF declarations. Bzlmod
+source overrides must provide the shared sysroot and SWIG APIs from the pinned
+0.0.7 infrastructure release or a compatible newer version.
 The ARMHF Go link selects lld and PIE mode so Go emits position-independent
 objects for LLVM's PIE executable link; native paths retain bfd and their
 existing Go link mode. The Go host wrapper selects its explicit QEMU mode for

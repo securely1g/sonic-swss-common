@@ -27,14 +27,14 @@ swig_gen_go(
 )
 
 armhf_swig(
+    swig_gen_go,
     name = "swsscommon_armhf_go_gen",
     hdrs = ["//:hdrs"],
-    header_out = "armhf/swsscommon_wrap.h",
+    cxx_out = "armhf/swsscommon_wrap.cxx",
+    go_out = "armhf/swsscommon.go",
+    hdr_out = "armhf/swsscommon_wrap.h",
     interface = SWIG_INTERFACE,
-    language = "go",
-    module_out = "armhf/swsscommon.go",
     swig_lib = ":swig_lib",
-    wrapper_out = "armhf/swsscommon_wrap.cxx",
 )
 
 # Wrapper cc_library that links the consolidated shared library and exposes

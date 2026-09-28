@@ -29,17 +29,17 @@ swig_gen(
 )
 
 armhf_swig(
+    swig_gen,
     name = "swsscommon_armhf_pyy",
     hdrs = ["//:hdrs"],
+    cpp_out = "armhf/py3/swsscommon_wrap.cpp",
     defines = select({
         "//tools/bazel:yang_modules_enabled": ["ENABLE_YANG_MODULES"],
         "//conditions:default": [],
     }),
     interface = "swsscommon.i",
-    language = "python",
-    module_out = "armhf/py3/swsscommon.py",
+    python_out = "armhf/py3/swsscommon.py",
     swig_lib = ":swig_lib",
-    wrapper_out = "armhf/py3/swsscommon_wrap.cpp",
 )
 
 cc_library(
