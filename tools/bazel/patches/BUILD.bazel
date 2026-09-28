@@ -1,3 +1,0 @@
-exports_files([
-    "rules_distroless_armhf_cpu.patch",
-])

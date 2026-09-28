@@ -1,7 +1,9 @@
 common --check_direct_dependencies=off
 common --noincompatible_disallow_empty_glob
 
-# Try to read from sonic-bazel-registry first
+# Shared SONiC releases, pinned so dependency roots receive the ARMHF fix.
+common --registry=https://raw.githubusercontent.com/securely1g/sonic-bazel-registry/ab3d2af909a4791bdc53d3aa48005c36cb7d528a
+# Retain the source registry for the existing shared toolchain releases.
 common --registry=https://raw.githubusercontent.com/blorente/sonic-bazel-registry/main
 # If a dependency is not found there, use the Bazel Central Registry
 common --registry=https://bcr.bazel.build/

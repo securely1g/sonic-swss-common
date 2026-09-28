@@ -198,8 +198,9 @@ standalone CI target list does not start Redis.
 ## ARMHF integration boundary
 
 The ARMHF setup is for the standalone Bazel 8.5.1 entry point. `MODULE.bazel`
-adds ARMHF to the shared pinned Trixie package sources, applies the
-rules_distroless ARMHF CPU mapping fix, and assembles the shared sysroot package
+adds ARMHF to the shared pinned Trixie package sources, selects the cumulative
+`rules_distroless` `0.9.4.sonic.2` release from the pinned securely1g registry,
+and assembles the shared sysroot package
 archives into the directory LLVM expects. The published shared GCC toolchains
 currently cover native AMD64 and ARM64, so ARMHF uses LLVM while retaining the
 Debian GCC 14 runtime libraries. The ARMHF configuration registers the pinned
@@ -224,10 +225,12 @@ optional Python bytecode precompilation because no ARMHF rules_python interprete
 toolchain is registered. The Python archive retains its sources, which the
 package test runs with the extracted Trixie ARMHF interpreter.
 
-A consuming root does not automatically import this repository's `.bazelrc` or
-apply its root module override. Top-level sonic-buildimage ARMHF integration
-must register the platform and toolchains, adopt the CPU mapping fix, and
-validate its own graph. This standalone support does not claim that integration.
+The shared Distroless release includes both protobuf `.inc` header support and
+the ARMHF CPU mapping, so consumers do not need a root-only patch override. A
+consuming root must configure the pinned registry because Bazel does not import
+a dependency's `.bazelrc`. Top-level sonic-buildimage ARMHF integration must also
+register the platform and toolchains and validate its own graph. This standalone
+support does not claim that integration.
 
 ## CodeQL C++ build
 
