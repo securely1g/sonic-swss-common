@@ -124,3 +124,18 @@ tar(
     ],
     visibility = ["//visibility:public"],
 )
+
+# Keep the source-built YANG dependency and its matching symbols together.
+copy_file(
+    name = "libyang_dependency_pkg",
+    src = "@libyang//:libyang_pkg",
+    out = "libyang_dependency_pkg.tar",
+    allow_symlink = False,
+)
+
+copy_file(
+    name = "libyang_dependency_pkg.debug_symbols",
+    src = "@libyang//:libyang_pkg.debug_symbols",
+    out = "libyang_dependency_pkg.debug_symbols.tar",
+    allow_symlink = False,
+)

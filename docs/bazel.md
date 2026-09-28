@@ -56,6 +56,10 @@ targets=(
 yang_targets=(
   //common:cfg_schema_generated
   //tools/bazel/yang:yang_models_dependency_pkg
+  //dist:libyang_dependency_pkg
+  //dist:libyang_dependency_pkg.debug_symbols
+  @libyang//:libyang_test
+  @libyang//:libyang_package_test
   //tests:defaultvalueprovider_ut
   //tools/bazel/yang:yang_models_dependency_package_test
   //tools/bazel/yang:libyang_runtime_test
@@ -109,9 +113,12 @@ Every download contains these four archives:
 - `sonic-db-cli_pkg.tar`: database CLI.
 - `swsscommon_pkg.tar.gz`: Python bindings.
 
-The YANG downloads also contain `yang_models_dependency_pkg.tar`. Install it
-with `libswsscommon_pkg.tar` for enabled deployments, together with the Trixie
-runtime libraries including `libyang3`. It installs the prepared models at
+The YANG downloads also contain `yang_models_dependency_pkg.tar`,
+`libyang_dependency_pkg.tar`, and `libyang_dependency_pkg.debug_symbols.tar`.
+Install the model and libyang runtime archives with `libswsscommon_pkg.tar`
+for enabled deployments, together with the remaining Trixie runtime libraries.
+Keep the libyang symbol archive with its matching runtime for debugging.
+The model archive installs the prepared models at
 `/usr/local/yang-models`, the path used by `DefaultValueProvider`. Production
 Make supplies this dependency through the `sonic_yang_models` wheel; the Bazel
 archive carries that wheel's model payload for deployments using these tar
@@ -177,9 +184,12 @@ default header for the enabled and disabled modes.
 The enabled C++ fixture test loads models through the shared library. Package
 tests check the native feature symbols, import and construct the enabled Python
 class from the archive, and verify the model archive's installed path and bytes.
-The libyang runtime test checks that libyang and libxxhash load from declared
-runfiles. The Python package and Go consumer tests stage native runtime libraries
-from the same pinned Trixie package inputs as the build. The Go test exercises
+The libyang runtime test checks that source-built libyang loads from declared
+runfiles; PCRE2 and xxHash are statically linked implementation dependencies.
+The registry package test checks its SONAME, symlinks, detached-symbol pairing,
+and GDB source lookup. The Python package and Go consumer tests stage the same
+source-built libyang and pinned Trixie runtime packages used by the build.
+The Go test exercises
 wrapped value types and calls `Select` in the current shared library without
 Redis. It checks that the current library is loaded and that hiredis and the
 enabled mode's libyang come from the staged runtime; disabled mode must not load

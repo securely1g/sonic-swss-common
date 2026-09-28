@@ -23,14 +23,11 @@ cc_binary(
     features = ["-sonic_installed_runtime_paths"],
     linkopts = [
         "-Wl,-z,now",
-        # Imported libyang has no runpath. Keep Bazel's library paths transitive
-        # so its libxxhash dependency also resolves from declared runfiles.
-        "-Wl,--disable-new-dtags",
     ],
     linkshared = True,
     deps = [
+        "@libyang",
         "@rules_python//python/cc:current_py_cc_headers",
-        "@sonic-swss-common//tools/bazel/yang:libyang_execution_deps",
     ],
 )
 

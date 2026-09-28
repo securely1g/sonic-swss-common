@@ -52,6 +52,15 @@ def main():
         SWSS_RUNTIME_ROOT=str(runtime_root),
         SWSS_YANG_MODE=yang_mode,
     )
+    if yang_mode == "enabled":
+        # Bazel's source-built libyang introduces DT_RPATH entries, which take
+        # precedence over LD_LIBRARY_PATH. Load the exact extracted SONAME so
+        # the Go consumer exercises the deployed payload, keeping its loaded
+        # path assertion rather than falling back to a build-tree library.
+        libyang = {path.resolve() for path in runtime_root.rglob("libyang.so.3")}
+        if len(libyang) != 1:
+            raise AssertionError(f"Expected one staged libyang, found {sorted(libyang)}")
+        environment["LD_PRELOAD"] = str(libyang.pop())
     if expected_library != "-":
         environment["SWSS_EXPECTED_LIBRARY"] = str(Path(expected_library).resolve())
 

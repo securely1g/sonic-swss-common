@@ -17,7 +17,7 @@ def declared_runfiles():
             continue
         visited.add(resolved_directory)
         for name in files:
-            if name.startswith(("libyang.so", "libxxhash.so")):
+            if name.startswith(("libyang.so",)):
                 declared.add((Path(directory) / name).resolve())
     return declared
 
@@ -32,7 +32,7 @@ def main():
             loaded.add(Path(fields[5]).resolve())
 
     declared = declared_runfiles()
-    for prefix in ("libyang.so.", "libxxhash.so."):
+    for prefix in ("libyang.so.",):
         matches = {path for path in loaded if path.name.startswith(prefix)}
         if len(matches) != 1:
             raise AssertionError(f"Expected one loaded {prefix} library, found {sorted(matches)}")

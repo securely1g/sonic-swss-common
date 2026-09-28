@@ -15,13 +15,13 @@ standalone Bazel 8 build. The public build option and header override remain in
   [`src/libyang3-py3/Makefile`](https://github.com/securely1g/sonic-buildimage/blob/9ab452d22773c41783092ae3bd6c206d6c257c8d/src/libyang3-py3/Makefile)
   clones CESNET/libyang-python at `v3.1.0` and applies the four patches listed
   in `src/libyang3-py3/patch/series`. Bazel uses that same release and series.
-- The shared SONiC Bazel registry supplies Debian Trixie `libyang3` and
-  `libyang-dev` version `3.12.2-1`. The CFFI binding is compiled against those
-  declared headers and libraries. Production Make also starts from libyang
-  `3.12.2` and adds its `LYD_VALIDATE_NOEXTDEPS` patch. The swsscommon schema
-  generator and default-value provider do not use that additional flag; schema
-  generation and the shared-library fixture test exercise their compatibility
-  with the selected Debian library.
+- The shared SONiC Bazel registry supplies source-built `libyang` module
+  `3.12.2.sonic.1`. It compiles libyang `3.12.2` with the production
+  `LYD_VALIDATE_NOEXTDEPS` patch from that same buildimage revision and enables
+  large-file support. Its PCRE2 `10.45` and xxHash `0.8.3` dependencies are
+  source-built and statically linked into `libyang.so.3`; no distro libyang or
+  separate libxxhash shared object is used. Public headers and the CFFI binding
+  resolve the same module in their respective target/execution configurations.
 - `requirements.in` and `requirements_lock.txt` pin the Python dependencies
   for the tools, including the setup requirements used by the model package.
 
@@ -51,13 +51,11 @@ dependency on a second Python runtime. The pinned GCC toolchain normally adds
 runtime search paths for the installed filesystem. The local
 [`sonic-build-infra-optional-runtime-paths.patch`](patches/sonic-build-infra-optional-runtime-paths.patch)
 keeps those paths enabled by default and lets this private extension disable
-them. Its execution dependency adapter also removes installed-filesystem paths
-contributed by the distro library rules.
-
-The extension uses `DT_RPATH` so Bazel's library search paths also apply to
-libyang's indirect libxxhash dependency. The runtime test compares the loaded
-libyang and libxxhash files with the declared runfiles tree. The deployed
-swsscommon Python package keeps its target-platform Python dependency.
+them. The source-built libyang module needs no distro linker-path adapter.
+The runtime test compares the loaded libyang file with the declared runfiles
+tree. PCRE2 and xxHash are static implementation dependencies, so they do not
+need separate shared-library runfiles. The deployed swsscommon Python package
+keeps its target-platform Python dependency.
 
 The actions pass an offline package-installer environment and request network
 blocking. Python dependencies and the CFFI source generator are declared Bazel
@@ -90,10 +88,18 @@ file is not an input to the CFFI binding build.
 `yang_models_dependency_pkg.tar` installs the prepared model tree at
 `/usr/local/yang-models`. This is the runtime payload supplied by the production
 `sonic_yang_models` wheel, packaged separately from swsscommon's runtime tar.
-Enabled deployments install it alongside `libswsscommon_pkg.tar` and the native
-runtime libraries. The package test compares every archived model byte with the
-prepared tree and checks the installed path.
+Enabled deployments install it alongside `libswsscommon_pkg.tar`,
+`libyang_dependency_pkg.tar`, and the remaining Trixie runtime libraries.
+The libyang dependency package and `libyang_dependency_pkg.debug_symbols.tar`
+come from the same linked ELF through the shared debug-packaging rule.
+The model package test compares every archived model byte with the prepared
+tree and checks the installed path.
 
 When updating these pins, compare the prepared model tree and generated header
 with the Make path and run the enabled and disabled target lists in
 [`docs/bazel.md`](../../../docs/bazel.md).
+
+The staged Python/Go package tests preload the exact extracted libyang SONAME.
+Bazel's embedded `DT_RPATH` would otherwise take precedence over
+`LD_LIBRARY_PATH` and could select the build-tree copy. The tests retain their
+loaded-path checks, so this validates the deployed payload explicitly.

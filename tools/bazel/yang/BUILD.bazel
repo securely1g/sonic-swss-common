@@ -2,7 +2,6 @@ load("@rules_python//python:py_binary.bzl", "py_binary")
 load("@rules_python//python:py_test.bzl", "py_test")
 load("@tar.bzl", "mtree_mutate", "mtree_spec", "tar")
 load(":cfg_schema.bzl", "prepared_yang_models")
-load(":execution_cc_deps.bzl", "execution_cc_deps")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -13,11 +12,6 @@ exports_files([
     "requirements_lock.txt",
     "sonic_yang_sources.BUILD.bazel",
 ])
-
-execution_cc_deps(
-    name = "libyang_execution_deps",
-    dep = "@trixie//libyang-dev:libyang",
-)
 
 py_binary(
     name = "emit_cffi",
