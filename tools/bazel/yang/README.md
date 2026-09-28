@@ -16,7 +16,7 @@ standalone Bazel 8 build. The public build option and header override remain in
   patches as the production
   [`src/libyang3-py3/Makefile`](https://github.com/securely1g/sonic-buildimage/blob/9ab452d22773c41783092ae3bd6c206d6c257c8d/src/libyang3-py3/Makefile)
   and owns CFFI source generation, the Python library, and binding tests. Its
-  [module README](https://github.com/securely1g/sonic-bazel-registry/blob/68838e5221c8e5211a41511a2bb37d0e5d217a93/modules/libyang-python/3.1.0-sonic.4/README.md)
+  [module README](https://github.com/securely1g/sonic-bazel-registry/blob/9319691b8ccfa9f143843f8bcffbafdddbc2e8d5/modules/libyang-python/3.1.0-sonic.4/README.md)
   records patch provenance and strict patch application. This revision selects
   the merged native CPU hardening fix; the infrastructure source tree, binding
   source, and production patches are unchanged from the previous registration.
