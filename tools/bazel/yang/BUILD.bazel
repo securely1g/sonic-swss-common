@@ -6,19 +6,9 @@ load(":cfg_schema.bzl", "prepared_yang_models")
 package(default_visibility = ["//visibility:public"])
 
 exports_files([
-    "libyang_python.BUILD.bazel",
-    "patches/0003-pr132-backlinks.patch",
-    "patches/sonic-build-infra-optional-runtime-paths.patch",
     "requirements_lock.txt",
     "sonic_yang_sources.BUILD.bazel",
 ])
-
-py_binary(
-    name = "emit_cffi",
-    srcs = ["emit_cffi.py"],
-    python_version = "3.13",
-    deps = ["@swss_yang_pip//cffi"],
-)
 
 py_binary(
     name = "prepare_yang_models",
@@ -63,13 +53,6 @@ tar(
     name = "yang_models_dependency_pkg",
     srcs = [":yang_models"],
     mtree = ":yang_models_dependency_mtree",
-)
-
-py_test(
-    name = "libyang_runtime_test",
-    srcs = ["libyang_runtime_test.py"],
-    python_version = "3.13",
-    deps = ["@swss_libyang_python//:libyang"],
 )
 
 py_test(

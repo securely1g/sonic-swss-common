@@ -62,7 +62,8 @@ yang_targets=(
   @libyang//:libyang_package_test
   //tests:defaultvalueprovider_ut
   //tools/bazel/yang:yang_models_dependency_package_test
-  //tools/bazel/yang:libyang_runtime_test
+  @libyang_python//:libyang_runtime_test
+  @libyang_python//:libyang_upstream_test
 )
 
 # Native AMD64, YANG enabled (the default)

@@ -23,15 +23,15 @@ bazel_dep(name = "platforms", version = "1.1.0")
 bazel_dep(name = "tar.bzl", version = "0.10.5")
 bazel_dep(name = "rules_distroless", version = "0.9.4")
 bazel_dep(name = "libyang", version = "3.12.2.sonic.1")
+bazel_dep(name = "libyang-python", version = "3.1.0-sonic.1", repo_name = "libyang_python")
 bazel_dep(name = "libnl3", version = "3.7.0.sonic-buildimage")
-bazel_dep(name = "sonic-build-infra", version = "0.0.4-83b4e9d963f7f268d06983a8c954fc5d6d93ce2b", repo_name = "sonic_build_infra")
+bazel_dep(name = "sonic-build-infra", version = "0.0.4-7ce718859ccf79fdafbf5cb5abd32bcca164f126", repo_name = "sonic_build_infra")
 
-# Keep installed runtime search paths for target outputs while allowing the
-# private YANG execution tool to resolve native libraries from Bazel runfiles.
+# Commit-based versions do not sort by source history. Select the shared
+# runtime-path feature revision used by libyang-Python.
 single_version_override(
     module_name = "sonic-build-infra",
-    patch_strip = 1,
-    patches = ["//tools/bazel/yang:patches/sonic-build-infra-optional-runtime-paths.patch"],
+    version = "0.0.4-7ce718859ccf79fdafbf5cb5abd32bcca164f126",
 )
 
 # Schema generation runs on the execution platform with a declared Python
@@ -51,9 +51,9 @@ pip.parse(
 use_repo(pip, "swss_yang_pip")
 
 # Production Make inputs from securely1g/sonic-buildimage master. The model
-# manifest, templates, sonic_yang modules, and libyang-Python patch series are
-# kept together at one source revision. These repositories only add Bazel build
-# metadata; the source inputs remain the same as the production Make path.
+# manifest, templates, and sonic_yang modules are kept at one source revision.
+# This repository only adds Bazel build metadata; the source inputs remain the
+# same as the production Make path.
 http_archive = use_repo_rule("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 
 http_archive(
@@ -62,22 +62,6 @@ http_archive(
     sha256 = "006f73ee4e03bbfb1cf03910ebabdc2c0798f64098b1379777c9f70d5e538555",
     strip_prefix = "sonic-buildimage-9ab452d22773c41783092ae3bd6c206d6c257c8d",
     urls = ["https://github.com/securely1g/sonic-buildimage/archive/9ab452d22773c41783092ae3bd6c206d6c257c8d.tar.gz"],
-)
-
-http_archive(
-    name = "swss_libyang_python",
-    build_file = "//tools/bazel/yang:libyang_python.BUILD.bazel",
-    patch_args = ["-p1"],
-    patches = [
-        "@swss_yang_sources//:src/libyang3-py3/patch/0001-debian.patch",
-        "@swss_yang_sources//:src/libyang3-py3/patch/0002-pr134-json-string-datatypes.patch",
-        # Refreshes only the context after 0002 for Bazel's strict patcher.
-        "//tools/bazel/yang:patches/0003-pr132-backlinks.patch",
-        "@swss_yang_sources//:src/libyang3-py3/patch/0004-pr141-test-crash.patch",
-    ],
-    sha256 = "4c58ed013e53dda2969e2fd386dbb6251f4a5fa599faa8c85e0e0100a9d97ef9",
-    strip_prefix = "libyang-python-3.1.0",
-    urls = ["https://github.com/CESNET/libyang-python/archive/refs/tags/v3.1.0.tar.gz"],
 )
 
 gcc = use_extension("@sonic_build_infra//toolchains/gcc:extensions.bzl", "gcc")

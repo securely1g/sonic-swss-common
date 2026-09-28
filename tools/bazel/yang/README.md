@@ -8,13 +8,16 @@ standalone Bazel 8 build. The public build option and header override remain in
 
 `MODULE.bazel` pins the following inputs with archive hashes:
 
-- The models, templates, `sonic_yang` Python modules, and libyang-Python patch
-  series come from `securely1g/sonic-buildimage` revision
+- The models, templates, and `sonic_yang` Python modules come from
+  `securely1g/sonic-buildimage` revision
   [`9ab452d22773c41783092ae3bd6c206d6c257c8d`](https://github.com/securely1g/sonic-buildimage/tree/9ab452d22773c41783092ae3bd6c206d6c257c8d).
-- The production
+- The shared SONiC Bazel registry supplies `libyang-python` module
+  `3.1.0-sonic.1`. It builds CESNET/libyang-python `v3.1.0` with the same four
+  patches as the production
   [`src/libyang3-py3/Makefile`](https://github.com/securely1g/sonic-buildimage/blob/9ab452d22773c41783092ae3bd6c206d6c257c8d/src/libyang3-py3/Makefile)
-  clones CESNET/libyang-python at `v3.1.0` and applies the four patches listed
-  in `src/libyang3-py3/patch/series`. Bazel uses that same release and series.
+  and owns CFFI source generation, the Python library, and binding tests. Its
+  [module README](https://github.com/securely1g/sonic-bazel-registry/blob/2a44eca5ae4437528bc5862589839b7b3724b8e0/modules/libyang-python/3.1.0-sonic.1/README.md)
+  records patch provenance and strict patch application.
 - The shared SONiC Bazel registry supplies source-built `libyang` module
   `3.12.2.sonic.1`. It compiles libyang `3.12.2` with the production
   `LYD_VALIDATE_NOEXTDEPS` patch from that same buildimage revision and enables
@@ -22,8 +25,9 @@ standalone Bazel 8 build. The public build option and header override remain in
   source-built and statically linked into `libyang.so.3`; no distro libyang or
   separate libxxhash shared object is used. Public headers and the CFFI binding
   resolve the same module in their respective target/execution configurations.
-- `requirements.in` and `requirements_lock.txt` pin the Python dependencies
-  for the tools, including the setup requirements used by the model package.
+- `requirements.in` and `requirements_lock.txt` pin the remaining Python
+  dependencies for schema and model preparation, including the setup
+  requirements used by the model package.
 
 The standalone Azure build uses a different Python binding input:
 [`build-env/packages/base.yaml`](../../../build-env/packages/base.yaml) installs
@@ -45,17 +49,17 @@ and native libyang dependencies all use Bazel's execution configuration. The
 compiled swsscommon library uses the target configuration. This separation
 keeps schema generation independent of the target CPU.
 
-The CFFI extension uses `current_py_cc_headers` from the selected Python
+The registry binding uses `current_py_cc_headers` from the selected Python
 toolchain. It resolves Python symbols from that interpreter and has no dynamic
-dependency on a second Python runtime. The pinned GCC toolchain normally adds
-runtime search paths for the installed filesystem. The local
-[`sonic-build-infra-optional-runtime-paths.patch`](patches/sonic-build-infra-optional-runtime-paths.patch)
-keeps those paths enabled by default and lets this private extension disable
-them. The source-built libyang module needs no distro linker-path adapter.
-The runtime test compares the loaded libyang file with the declared runfiles
-tree. PCRE2 and xxHash are static implementation dependencies, so they do not
-need separate shared-library runfiles. The deployed swsscommon Python package
-keeps its target-platform Python dependency.
+dependency on a second Python runtime. Its private CFFI extension disables the
+shared `sonic_installed_runtime_paths` feature so the loader uses declared Bazel
+runfiles. The pinned infrastructure revision keeps those installed filesystem
+paths enabled by default for target outputs. The module runtime test checks the
+loaded extension, CFFI backend, and native libyang against the declared runfiles;
+the upstream binding suite covers its schema and data APIs. PCRE2 and xxHash are
+static implementation dependencies, so they do not need separate shared-library
+runfiles. The deployed swsscommon Python package keeps its target-platform
+Python dependency.
 
 The actions pass an offline package-installer environment and request network
 blocking. Python dependencies and the CFFI source generator are declared Bazel
@@ -67,21 +71,6 @@ options attribute. `../swig.bzl` provides a small declared interface adapter
 for the feature define. The original interface is also an explicit SWIG input.
 The adapter supports defines and undefines so a caller can select architecture
 preprocessor settings when the shared rule still supplies a default.
-
-## Strict patch application
-
-`patches/0003-pr132-backlinks.patch` is the production patch with its context
-refreshed after `0002-pr134-json-string-datatypes.patch`. The original third
-patch expects `json_null` immediately before a closing parenthesis; the second
-patch inserts `json_string_datatypes` there. The local copy adds that unchanged
-context line and updates the hunk coordinates. Its semantic additions and
-deletions are unchanged, and the source URL is recorded in the patch.
-
-For this pinned series, comparison against the original production Quilt
-application found the same 54 file paths and identical source bytes. The only
-byte difference was a final newline in `debian/watch`: Bazel's native patcher
-adds it where the original patch records no final newline. That Debian metadata
-file is not an input to the CFFI binding build.
 
 ## Runtime model dependency
 

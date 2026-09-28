@@ -2,7 +2,7 @@ common --check_direct_dependencies=off
 common --noincompatible_disallow_empty_glob
 
 # Try to read from sonic-bazel-registry first
-common --registry=https://raw.githubusercontent.com/securely1g/sonic-bazel-registry/88838b5a2cdc12b68ba414ab33fa0141eba04ae3
+common --registry=https://raw.githubusercontent.com/securely1g/sonic-bazel-registry/2a44eca5ae4437528bc5862589839b7b3724b8e0
 # If a dependency is not found there, use the Bazel Central Registry
 common --registry=https://bcr.bazel.build/
 

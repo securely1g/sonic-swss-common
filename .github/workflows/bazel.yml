@@ -78,7 +78,8 @@ jobs:
           //dist:libswsscommon_package_test
           //pyext:swsscommon_package_test
           //tools/bazel/yang:yang_models_dependency_package_test
-          //tools/bazel/yang:libyang_runtime_test
+          @libyang_python//:libyang_runtime_test
+          @libyang_python//:libyang_upstream_test
 
       - name: Collect YANG package artifacts
         run: |
