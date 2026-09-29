@@ -8,15 +8,15 @@ and their standalone tests belong to the SONiC Bazel registry.
 
 `MODULE.bazel` selects these registry modules:
 
-- [`sonic-yang-models` `1.0.0-9ab452d22773c41783092ae3bd6c206d6c257c8d`](https://github.com/securely1g/sonic-bazel-registry/blob/645a6ebc497116210527410f978f6855db7c792d/modules/sonic-yang-models/1.0.0-9ab452d22773c41783092ae3bd6c206d6c257c8d/README.md)
+- [`sonic-yang-models` `1.0.0-9ab452d22773c41783092ae3bd6c206d6c257c8d`](https://github.com/securely1g/sonic-bazel-registry/blob/e512f6334aa7b5dbf88afe06374ffdd426c23f87/modules/sonic-yang-models/1.0.0-9ab452d22773c41783092ae3bd6c206d6c257c8d/README.md)
   owns the production model sources/templates, setup manifest, preparation
   action, runtime package, and model/package checks. Common consumes its
   `@sonic_yang_models//:yang_models` directory.
-- [`sonic-yang-mgmt` `1.0.0-9ab452d22773c41783092ae3bd6c206d6c257c8d`](https://github.com/securely1g/sonic-bazel-registry/blob/645a6ebc497116210527410f978f6855db7c792d/modules/sonic-yang-mgmt/1.0.0-9ab452d22773c41783092ae3bd6c206d6c257c8d/README.md)
+- [`sonic-yang-mgmt` `1.0.0-9ab452d22773c41783092ae3bd6c206d6c257c8d`](https://github.com/securely1g/sonic-bazel-registry/blob/e512f6334aa7b5dbf88afe06374ffdd426c23f87/modules/sonic-yang-mgmt/1.0.0-9ab452d22773c41783092ae3bd6c206d6c257c8d/README.md)
   supplies the `sonic_yang` Python modules through
   `@sonic_yang_mgmt//:sonic_yang_mgmt`. It owns the library's Python dependencies
   and its standalone runtime test.
-- Native [`libyang` `3.12.2.sonic.1`](https://github.com/securely1g/sonic-bazel-registry/blob/645a6ebc497116210527410f978f6855db7c792d/modules/libyang/3.12.2.sonic.1/README.md)
+- Native [`libyang` `3.12.2.sonic.1`](https://github.com/securely1g/sonic-bazel-registry/blob/e512f6334aa7b5dbf88afe06374ffdd426c23f87/modules/libyang/3.12.2.sonic.1/README.md)
   supplies matching headers, `libyang.so.3`, and runtime/debug packages. It
   preserves the production `LYD_VALIDATE_NOEXTDEPS` patch and large-file support;
   PCRE2 and xxHash are source-built static implementation dependencies.
@@ -24,7 +24,7 @@ and their standalone tests belong to the SONiC Bazel registry.
 Both SONiC YANG modules use production buildimage revision
 [`9ab452d22773c41783092ae3bd6c206d6c257c8d`](https://github.com/securely1g/sonic-buildimage/tree/9ab452d22773c41783092ae3bd6c206d6c257c8d).
 The management module depends on registry
-[`libyang-python` `3.1.0-sonic.1`](https://github.com/securely1g/sonic-bazel-registry/blob/645a6ebc497116210527410f978f6855db7c792d/modules/libyang-python/3.1.0-sonic.1/README.md),
+[`libyang-python` `3.1.0-sonic.1`](https://github.com/securely1g/sonic-bazel-registry/blob/e512f6334aa7b5dbf88afe06374ffdd426c23f87/modules/libyang-python/3.1.0-sonic.1/README.md),
 which builds CESNET/libyang-python `v3.1.0` with the four patches used by the
 production `src/libyang3-py3/Makefile`. The registry owns CFFI generation and the
 binding's dependencies and tests. This differs from standalone Azure's
