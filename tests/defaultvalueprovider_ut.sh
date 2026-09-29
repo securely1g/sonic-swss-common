@@ -5,7 +5,9 @@ test_binary="$1"
 if [[ "${test_binary}" != /* ]]; then
     test_binary="${PWD}/${test_binary}"
 fi
-fixture_root="${TEST_SRCDIR}/${TEST_WORKSPACE}/tests"
+# The declared binary and fixtures share a package in the runfiles tree. Keep
+# that path (without resolving the binary symlink) when this is an external repo.
+fixture_root="$(dirname "${test_binary}")"
 
 mkdir -p "${TEST_TMPDIR}/tests/yang" "${TEST_TMPDIR}/tests/yang-missing-ref"
 cp --dereference "${fixture_root}/yang/"*.yang "${TEST_TMPDIR}/tests/yang/"
