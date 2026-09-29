@@ -34,6 +34,11 @@ if [[ -z "${qemu}" ]]; then
     echo "Install qemu-user to execute the ARMHF Python runtime test" >&2
     exit 1
 fi
+target_library_path="${runtime_root}/usr/local/lib:${runtime_root}/usr/lib/arm-linux-gnueabihf"
+qemu_environment=(-E "LD_LIBRARY_PATH=${target_library_path}")
+if [[ "${yang_mode}" == enabled ]]; then
+    qemu_environment+=(-E "LD_PRELOAD=${runtime_root}/usr/lib/arm-linux-gnueabihf/libyang.so.3")
+fi
 echo "ARMHF Python execution on $(uname -m) with ${qemu}"
 PYTHONHOME="${runtime_root}/usr" \
 PYTHONPATH="${runtime_root}/usr/lib/python3/dist-packages" \
@@ -43,7 +48,7 @@ ARMHF_COMPLETION_SENTINEL="${completion_sentinel}" \
 ARMHF_YANG_MODE="${yang_mode}" \
 RUNFILES_DIR= \
 RUNFILES_MANIFEST_FILE= \
-    "${qemu}" -L "${runtime_root}" "${python}" -S -c '
+    "${qemu}" -L "${runtime_root}" "${qemu_environment[@]}" "${python}" -S -c '
 import os
 from pathlib import Path
 import struct
@@ -63,6 +68,15 @@ values.append(pair)
 assert len(values) == 1 and values[0] == ("field", "value")
 yang_mode = os.environ["ARMHF_YANG_MODE"]
 assert yang_mode in {"enabled", "disabled"}, yang_mode
+loaded = {
+    Path(fields[5]).resolve()
+    for line in Path("/proc/self/maps").read_text().splitlines()
+    if len(fields := line.split(maxsplit=5)) == 6 and fields[5].startswith("/")
+}
+for prefix, required in [("libhiredis.so.", True), ("libyang.so.", yang_mode == "enabled")]:
+    matches = {path for path in loaded if path.name.startswith(prefix)}
+    assert len(matches) == int(required), matches
+    assert all(path.is_relative_to(runtime_root) for path in matches), matches
 yang_classes = (
     "DefaultValueProvider",
     "DecoratorTable",
@@ -77,6 +91,8 @@ if yang_mode == "enabled":
         assert hasattr(swsscommon, name), name
     for name, value in yang_constants.items():
         assert getattr(swsscommon, name) == value, name
+    provider = swsscommon.DefaultValueProvider()
+    assert provider.thisown
 else:
     for name in (*yang_classes, *yang_constants):
         assert not hasattr(swsscommon, name), name

@@ -26,8 +26,8 @@ _APT_DEPS = [
     "@trixie//libboost-serialization-dev:libboost-serialization",
 ]
 
-_YANG_APT_DEPS = select({
-    "//tools/bazel:yang_modules_enabled": ["@trixie//libyang-dev:libyang"],
+_YANG_DEPS = select({
+    "//tools/bazel:yang_modules_enabled": ["@libyang//:libyang"],
     "//conditions:default": [],
 })
 
@@ -53,7 +53,7 @@ _SYSTEM_LINKOPTS = [
     "//conditions:default": [],
 })
 
-SWSS_COMMON_DEPS = _APT_DEPS + _YANG_APT_DEPS if IS_BZLMOD else []
+SWSS_COMMON_DEPS = _APT_DEPS + _YANG_DEPS if IS_BZLMOD else []
 
 SWSS_COMMON_COPTS = [] if IS_BZLMOD else _SYSTEM_COPTS
 

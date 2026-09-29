@@ -3,8 +3,8 @@
 The standalone build uses Bazel 8.5.1, selected by `.bazelversion`. Install
 [Bazelisk](https://bazel.build/install/bazelisk) and invoke it as `bazel`.
 Dependencies come from the configured SONiC Bazel registry and the Bazel Central
-Registry. Bazel downloads the native GCC 14.2 toolchains, the LLVM 20.1.4 ARMHF
-toolchain, and the Debian package inputs.
+Registry; the native GCC 14.2 toolchain and Debian package inputs are downloaded
+by Bazel.
 
 ## Environment
 
@@ -50,11 +50,14 @@ tools continue to run on the ARM64 host.
 
 ## Build and test
 
-Run the following from the repository root in Bash. CI uses these explicit
-labels so a required output's platform incompatibility fails the invocation.
+Run the following from the repository root in Bash. Define the common and YANG
+target lists, then run the command matching the machine's native CPU and desired
+feature mode. CI runs both modes with these explicit labels. Explicit labels
+make a required output's platform incompatibility fail the invocation instead
+of being skipped by a wildcard.
 
 ```bash
-outputs=(
+targets=(
   //:libswsscommon
   //:libswsscommon_shared
   //:libswsscommon_consolidated.so
@@ -64,50 +67,37 @@ outputs=(
   //dist:sonic-db-cli_pkg
   //pyext:swsscommon_pkg
   //goext:swsscommon
-)
-compiled_tests=(
+  //goext:swsscommon_runtime_test
   //tests:status_code_util_test
   //tests:saiaclschema_ut
   //tests:notification_queue_ut
   //tests:interface_ut
   //tests:vrf_ut
   //tests:shared_library_runtime_test
-)
-package_tests=(
   //dist:libswsscommon_package_test
-  //goext:swsscommon_runtime_test
+  //pyext:swsscommon_package_test
 )
 
-# Native AMD64
-bazel test --//tools/bazel:yang_modules=False --test_output=errors \
-  "${outputs[@]}" "${compiled_tests[@]}" "${package_tests[@]}"
+yang_targets=(
+  //common:cfg_schema_generated
+  //tests:defaultvalueprovider_ut
+)
 
-# Native ARM64
-bazel test --config=aarch64 --//tools/bazel:yang_modules=False --test_output=errors \
-  "${outputs[@]}" "${compiled_tests[@]}" "${package_tests[@]}"
+# Native AMD64, YANG enabled (the default)
+bazel test --//tools/bazel:yang_modules=True --test_output=errors "${targets[@]}" "${yang_targets[@]}"
 
-# ARMHF packages and host shell tests, from an ARM64 host with qemu-user
-bazel test --config=armhf --//tools/bazel:yang_modules=False --jobs=4 --test_output=errors \
-  "${outputs[@]}" "${package_tests[@]}" //tools/bazel/armhf:python_runtime_test
+# Native AMD64, YANG disabled
+bazel test --//tools/bazel:yang_modules=False --test_output=errors "${targets[@]}"
 
-# ARMHF compiled tests, using the scoped QEMU runner
-bazel test --config=armhf --//tools/bazel:yang_modules=False --jobs=4 --test_output=errors \
-  --run_under=//tools/bazel/armhf:qemu_run_under "${compiled_tests[@]}" \
-  //tools/bazel/armhf:abi_runtime_test
+# Native ARM64, YANG enabled
+bazel test --config=aarch64 --//tools/bazel:yang_modules=True --test_output=errors "${targets[@]}" "${yang_targets[@]}"
+
+# Native ARM64, YANG disabled
+bazel test --config=aarch64 --//tools/bazel:yang_modules=False --test_output=errors "${targets[@]}"
 ```
 
 `bazel test` builds the listed libraries, binaries, bindings, and packages as
-well as running the listed tests. For ARMHF, the package inspection remains a
-host shell test. The scoped runner extracts the pinned target runtime and
-verifies that each compiled test is an ARM ELF32 hard-float binary before starting
-QEMU. The Go and Python host tests invoke QEMU for their target binaries. The
-Python test extracts the target runtime and package, verifies their ELF
-architecture, then imports and calls the binding using the ARMHF interpreter.
-The ARMHF ABI test checks 64-bit `off_t` and `time_t`, reads and writes beyond
-2 GiB in a sparse file, preserves post-2038 timestamps, and checks for errors
-while reading directories.
-
-CI also checks Bazel file formatting on the native jobs:
+well as running the listed tests. CI also checks Bazel file formatting:
 
 ```sh
 # Native AMD64
@@ -125,13 +115,14 @@ available for reviewing those lint warnings.
 
 Each successful Bazel job uploads its package archives. Open the repository's
 **Actions** tab, select a successful **Bazel** workflow run, and download the
-artifact for your architecture from the **Artifacts** section:
+artifact for your architecture and feature mode from the **Artifacts** section:
 
+- `sonic-swss-common-yang-AMD64`
+- `sonic-swss-common-yang-ARM64`
 - `sonic-swss-common-no-yang-AMD64`
 - `sonic-swss-common-no-yang-ARM64`
-- `sonic-swss-common-no-yang-ARMHF`
 
-Each download contains these four archives:
+Every download contains these four archives:
 
 - `libswsscommon_pkg.tar`: C++ runtime library, `swssloglevel`, Lua files, and
   database configuration.
@@ -140,22 +131,45 @@ Each download contains these four archives:
 - `sonic-db-cli_pkg.tar`: database CLI.
 - `swsscommon_pkg.tar.gz`: Python bindings.
 
-These target Debian Trixie using the no-YANG configuration described below.
-The runtime library is installed under the target multiarch directory:
-`x86_64-linux-gnu`, `aarch64-linux-gnu`, or `arm-linux-gnueabihf`. GitHub requires
-you to sign in to download workflow artifacts.
+### Dependency runtime packages
+
+Common's artifacts contain its own library, bindings, CLI, and symbols. Enabled
+deployments also require packages owned by the
+[SONiC Bazel registry](https://github.com/securely1g/sonic-bazel-registry/actions):
+
+- `sonic-yang-models`: `//:yang_models_pkg` installs the prepared model payload
+  under `/usr/local/yang-models`, the path used by `DefaultValueProvider`.
+- `libyang`: `//:libyang_pkg` supplies the native runtime, and
+  `//:libyang_pkg.debug_symbols` supplies its matching detached symbols.
+
+Select a successful **Registry CI** workflow for the module versions pinned
+by this build and download `registry-ci-<module>-<version>-<architecture>`
+(`amd64` or `arm64`). Its `outputs.json` maps declared build targets to retained
+files under `outputs/`, including their hashes. Keep each runtime/debug pair
+from the same run. Registry module READMEs linked in the
+[YANG input guide](../tools/bazel/yang/README.md) document the package targets.
+Common CI does not copy or upload these dependency archives. Its staged Python
+and Go tests still consume the pinned libyang runtime to verify integration.
+Install the model and libyang runtime with Common's runtime archive and the
+remaining Trixie runtime libraries. The Python bindings archive is required by
+Python consumers. Production Make supplies the models through the
+`sonic_yang_models` wheel; the registry tar carries the same model payload.
+
+The standalone build produces tar archives. Debian dependency metadata, the
+`libswsscommon-dev` package, and wheel packaging remain owned by the Make
+workflow. GitHub requires you to sign in to download workflow artifacts.
 
 ## Debug symbols
 
 Build the runtime package and its matching detached symbols together:
 
 ```sh
-bazel build --//tools/bazel:yang_modules=False \
+bazel build --//tools/bazel:yang_modules=True \
   //dist:libswsscommon_pkg //dist:libswsscommon_pkg.debug_symbols
 ```
 
-Add `--config=aarch64` on native ARM64 or `--config=armhf` for the ARMHF target.
-Packaging uses `sonic_deploy_tar` with
+Use `--//tools/bazel:yang_modules=False` for disabled mode, and add
+`--config=aarch64` on native ARM64. Packaging uses `sonic_deploy_tar` with
 `force_debug_build = True`, which applies `--copt=-g`, `--strip=never`, and a
 linker build ID to the package inputs while retaining the selected compilation
 mode and optimization settings. It derives the runtime copy and detached debug
@@ -174,33 +188,70 @@ settings. To build the raw shared library with embedded debug information, use
 the deployment transition, so those flags are unnecessary for the package command
 above.
 
-## Supported configuration
+## YANG configuration
 
-The standalone Bazel build currently supports the no-YANG configuration. Every
-build or test command above passes `--//tools/bazel:yang_modules=False` because
-the setting defaults to enabled and YANG-driven `cfg_schema.h` generation is
-not wired into Bazel yet. The supported configuration uses the minimal schema
-stub and omits the YANG-dependent sources. YANG functionality remains outside
-this CI coverage.
+`--//tools/bazel:yang_modules=True` is the default. It generates `cfg_schema.h`
+from the production model set, compiles `DefaultValueProvider` and both decorator
+table classes with libyang, and exposes those classes and generated table-name
+constants through the Python bindings. The disabled setting selects the minimal
+schema stub and omits the YANG native sources, libyang dependency, and Python
+API entries.
 
-The Go binding and a small consuming test are included in CI. The consuming
-test links the cgo wrapper and calls wrapped value types and `Select` without
-Redis. It checks that the current `libswsscommon` and staged hiredis library
-were loaded, and the no-YANG test rejects loading libyang. A host wrapper stages
-the pinned Trixie runtime libraries before starting the test. Ordinary Go
-consumers still need matching native libraries and loader configuration. Its
-Redis-backed integration test,
+Registry module `sonic-yang-models` prepares the production model set with its
+manifest, raw models, templates, and locked Python tools. Common's unchanged
+`gen_cfg_schema.py` consumes that prepared directory through the registry's
+`sonic-yang-mgmt` Python library. Schema generation runs on the execution
+platform, including its Python 3.13 and libyang inputs; the library's native
+dependencies follow the target platform. The generator declares its inputs and
+requests network blocking, with package installer network access disabled.
+
+The source revisions, libyang-Python patch provenance, and the difference from
+the standalone Azure build inputs are recorded in the
+[YANG input guide](../tools/bazel/yang/README.md). The public
+`//tools/bazel:cfg_schema` label setting remains available for downstream Bazel
+6 builds that supply a Make-generated header. Standalone Bazel 8 uses a selected
+default header for the enabled and disabled modes.
+
+Common CI checks the integration with these dependencies. The enabled C++
+fixture loads models through the shared library; package tests check native
+feature symbols and import and construct the enabled Python class from the
+archive. Registry CI independently checks the model package, management
+library, libyang runtime/package, and Python binding. PCRE2 and xxHash remain
+static implementation dependencies of native libyang.
+
+The Python package and Go consumer tests stage the same source-built libyang
+and pinned Trixie runtime packages used by the build. The Go test exercises
+wrapped value types and calls `Select` in the current shared library without
+Redis. It checks that the current library is loaded and that hiredis and the
+enabled mode's libyang come from the staged runtime; disabled mode must not load
+libyang.
+
+The Go binding target is included in CI. Its Redis-backed integration test,
 `//goext:swsscommon_test`, is tagged `manual` and requires the expected Redis
-endpoints and database configuration. Run that test separately in an environment
-providing those services and the matching native runtime libraries; the
-standalone CI target list does not start Redis.
+endpoints and database configuration, matching Trixie native libraries, and a
+loader configuration that can find them. Run that test separately in an
+environment providing those dependencies and services.
 
-## ARMHF integration boundary
+## ARMHF build and test
 
-The ARMHF setup is for the standalone Bazel 8.5.1 entry point. `MODULE.bazel`
-adds ARMHF to the shared pinned Trixie package sources, selects the cumulative
-`rules_distroless` `0.9.4.sonic.2` release from the pinned securely1g registry,
-and passes explicit package archives to build-infra's `debian_sysroot` assembler
+ARMHF CI runs both YANG modes. From the Trixie host described above, use the
+explicit native target lists above with `--config=armhf`, but replace the native
+Python package test with `//tools/bazel/armhf:python_runtime_test`. Run C++ tests
+with `--run_under=//tools/bazel/armhf:qemu_run_under`; include
+`//tools/bazel/armhf:abi_runtime_test`. Run `//tests:defaultvalueprovider_ut`
+without `--run_under`: its host fixture wrapper invokes the scoped QEMU runner.
+The package/debug, Go, and Python tests also own their host wrappers and run
+without a global `--run_under`.
+
+Each mode uploads `sonic-swss-common-<yang|no-yang>-ARMHF` with the same four
+Common archives as the native jobs. Enabled deployment additionally needs the
+model payload and source-built libyang runtime for ARMHF. The existing registry
+hosted artifacts cover native CPUs; Common's ARMHF tests build and stage the
+dependency locally and do not publish its package as a Common artifact.
+
+## ARMHF shared dependencies
+
+The shared `debian_sysroot` repository rule combines pinned target packages
 to form the directory LLVM expects. The published shared GCC toolchains
 currently cover native AMD64 and ARM64, so ARMHF uses LLVM while retaining the
 Debian GCC 14 runtime libraries. The ARMHF configuration registers the pinned
@@ -237,6 +288,7 @@ a dependency's `.bazelrc`. Top-level sonic-buildimage ARMHF integration must als
 register the platform and toolchains and validate its own graph. This standalone
 support does not claim that integration.
 
+
 ## CodeQL C++ build
 
 The C++ CodeQL job builds with Bazel inside a native AMD64 Debian Trixie
@@ -249,9 +301,9 @@ toolchain's explicit GCC and Debian include paths while retaining Bazel's header
 dependency checks.
 
 The build covers the library, command-line tools, and generated Python SWIG
-wrapper. The manual `//tests:codeql_test_sources` target also compiles the 48
-legacy C++ test files that the package build exposed to CodeQL, without requiring
-Redis services.
+wrapper with YANG enabled. The manual `//tests:codeql_test_sources` target also
+compiles all 49 legacy C++ test files, including the YANG fixture source, without
+requiring Redis services.
 
 ## SWIG constant wrapping
 

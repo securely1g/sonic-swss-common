@@ -123,6 +123,9 @@ sh_test(
             "$(location @armhf_llvm_llvm//:bin/llvm-objcopy)",
             "gdb-multiarch",
         ],
+    }) + select({
+        "//tools/bazel:yang_modules_enabled": ["enabled"],
+        "//conditions:default": ["disabled"],
     }),
     data = [
         ":libswsscommon_pkg",

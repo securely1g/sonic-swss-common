@@ -74,11 +74,13 @@ flatten(
     tars = [
         "@trixie//libboost-serialization-dev",
         "@trixie//libhiredis-dev",
-        "@trixie//libyang-dev",
         "@trixie//libzmq3-dev",
         "@trixie//python3-dev",
         "@trixie//uuid-dev",
-    ],
+    ] + select({
+        "//tools/bazel:yang_modules_enabled": ["@libyang//:libyang_pkg"],
+        "//conditions:default": [],
+    }),
 )
 
 sh_test(

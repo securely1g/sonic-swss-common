@@ -50,6 +50,8 @@ cc_library(
     # Strip the "common/" path prefix so CGO can #include "dbconnector.h" etc.
     strip_include_prefix = "/common",
     visibility = ["//visibility:public"],
+    # Keep native link dependencies aligned with :common, including libyang
+    # when the feature is enabled.
     deps = ["//:common_deps"],
 )
 

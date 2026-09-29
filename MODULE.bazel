@@ -22,8 +22,20 @@ bazel_dep(name = "bazel_skylib", version = "1.9.0")
 bazel_dep(name = "platforms", version = "1.1.0")
 bazel_dep(name = "tar.bzl", version = "0.10.5")
 bazel_dep(name = "rules_distroless", version = "0.9.4.sonic.2")
+bazel_dep(name = "libyang", version = "3.12.2.sonic.1")
 bazel_dep(name = "libnl3", version = "3.7.0.sonic-buildimage")
 bazel_dep(name = "sonic-build-infra", version = "0.0.7-91fe8246519f99838da936eee54e85208c704a4d", repo_name = "sonic_build_infra")
+bazel_dep(name = "sonic-yang-mgmt", version = "1.0.0-9ab452d22773c41783092ae3bd6c206d6c257c8d", repo_name = "sonic_yang_mgmt")
+bazel_dep(name = "sonic-yang-models", version = "1.0.0-9ab452d22773c41783092ae3bd6c206d6c257c8d", repo_name = "sonic_yang_models")
+
+# Schema generation runs on the execution platform with a declared Python
+# runtime. Its native CFFI binding uses headers from that interpreter toolchain.
+python = use_extension("@rules_python//python/extensions:python.bzl", "python")
+python.toolchain(python_version = "3.13")
+use_repo(python, "python_3_13")
+
+register_toolchains("@python_3_13//:all")
+
 bazel_dep(name = "swig", version = "4.3.0.bcr.2")
 bazel_dep(name = "toolchains_llvm", version = "1.10.0")
 

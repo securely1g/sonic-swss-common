@@ -6,6 +6,7 @@ symbols_archive="$2"
 expected_multiarch="$3"
 objcopy="$4"
 gdb="$5"
+yang_mode="$6"
 package_root="${TEST_TMPDIR}/libswsscommon-package"
 symbols_root="${TEST_TMPDIR}/libswsscommon-symbols"
 
@@ -161,4 +162,42 @@ if ! grep -Eq 'Line [0-9]+ of ".*common/redisreply\.cpp"' "${gdb_output}"; then
     exit 1
 fi
 
-echo "Runtime package layout and detached debug information are valid for ${expected_multiarch}"
+dynamic_entries="$(LC_ALL=C readelf --dynamic "${resolved_library}")"
+symbols="$(LC_ALL=C nm --dynamic --defined-only --demangle "${resolved_library}")"
+yang_symbols=(
+    "swss::DefaultValueProvider::DefaultValueProvider("
+    "swss::DecoratorTable::DecoratorTable("
+    "swss::DecoratorSubscriberStateTable::DecoratorSubscriberStateTable("
+)
+case "${yang_mode}" in
+    enabled)
+        if [[ "${dynamic_entries}" != *"Shared library: [libyang.so.3]"* ]]; then
+            echo "The YANG package must depend on libyang.so.3" >&2
+            exit 1
+        fi
+        for symbol in "${yang_symbols[@]}"; do
+            if [[ "${symbols}" != *"${symbol}"* ]]; then
+                echo "The YANG package is missing exported symbol ${symbol}" >&2
+                exit 1
+            fi
+        done
+        ;;
+    disabled)
+        if [[ "${dynamic_entries}" == *"Shared library: [libyang.so.3]"* ]]; then
+            echo "The no-YANG package must not depend on libyang.so.3" >&2
+            exit 1
+        fi
+        for symbol in "${yang_symbols[@]}"; do
+            if [[ "${symbols}" == *"${symbol}"* ]]; then
+                echo "The no-YANG package unexpectedly exports ${symbol}" >&2
+                exit 1
+            fi
+        done
+        ;;
+    *)
+        echo "Unknown YANG mode: ${yang_mode}" >&2
+        exit 1
+        ;;
+esac
+
+echo "Runtime package layout, detached debug information, and YANG ${yang_mode} feature set are valid"

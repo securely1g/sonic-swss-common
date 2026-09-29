@@ -17,7 +17,7 @@ flatten(
         "@trixie//python3-dev",
         "@trixie//uuid-dev",
     ] + select({
-        "//tools/bazel:yang_modules_enabled": ["@trixie//libyang-dev"],
+        "//tools/bazel:yang_modules_enabled": ["@libyang//:libyang_pkg"],
         "//conditions:default": [],
     }),
 )
