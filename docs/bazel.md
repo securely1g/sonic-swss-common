@@ -37,6 +37,7 @@ targets=(
   //:libswsscommon_shared
   //:libswsscommon_consolidated.so
   //:swssloglevel
+  //crates/swss-common:bindings_dir
   //dist:libswsscommon_pkg
   //dist:libswsscommon_pkg.debug_symbols
   //dist:sonic-db-cli_pkg
@@ -85,6 +86,28 @@ bazel run --config=aarch64 //tools/bazel/buildifier:buildifier.format.check
 The formatting target leaves lint disabled while the build retains intentional
 Bazel 6 compatibility code. The existing `buildifier.check` target remains
 available for reviewing those lint warnings.
+
+## Rust C API bindings
+
+`//crates/swss-common:bindings_dir` generates `bindings.rs` from every header in
+`common/c-api` and places it in the directory layout expected by Cargo's
+`OUT_DIR`. The header inventory comes from the same Bazel filegroup used by the
+native Common library, so adding a C API header also updates the binding input.
+The target uses `--with-derive-partialeq`, matching `build.rs`.
+
+A `crate_universe` consumer can disable Common's build script, provide this
+directory as `compile_data` and `OUT_DIR`, and depend on
+`//:libswsscommon_shared`. The Rust crate source and the native Common module
+must select the same source revision. The consuming root must register Rust and
+`rules_rust_bindgen` toolchains; Common's standalone toolchains are development
+dependencies and do not override a consumer's choices.
+
+Standalone CI generates bindings on native AMD64 and ARM64 in both YANG modes.
+It selects Rust 1.90.0, LLVM 17.0.6, and the bindgen 0.71.1 executable supplied
+by `rules_rust_bindgen` 0.74.0. Cargo's unchanged `build.rs` uses bindgen 0.70.1.
+The Bazel path is validated through downstream Rust compilation; it does not
+claim byte-for-byte equality with Cargo's generated file. This target generates
+bindings only and does not package or publish the Rust crate.
 
 ## Build artifacts
 

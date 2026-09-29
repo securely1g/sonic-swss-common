@@ -57,6 +57,7 @@ jobs:
           //:libswsscommon_shared
           //:libswsscommon_consolidated.so
           //:swssloglevel
+          //crates/swss-common:bindings_dir
           //dist:libswsscommon_pkg
           //dist:libswsscommon_pkg.debug_symbols
           //dist:sonic-db-cli_pkg
@@ -93,6 +94,7 @@ jobs:
           //:libswsscommon_shared
           //:libswsscommon_consolidated.so
           //:swssloglevel
+          //crates/swss-common:bindings_dir
           //dist:libswsscommon_pkg
           //dist:libswsscommon_pkg.debug_symbols
           //dist:sonic-db-cli_pkg
