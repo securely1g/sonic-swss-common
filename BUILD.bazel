@@ -15,7 +15,10 @@ load("//tools/bazel:flags.bzl", "CXXFLAGS_COMMON")
 
 package(default_visibility = ["//visibility:public"])
 
-exports_files(["LICENSE"])
+exports_files([
+    "LICENSE",
+    "gen_cfg_schema.py",
+])
 
 swss_common_hdrs = ["//common:hdrs"]
 

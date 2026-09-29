@@ -1,0 +1,29 @@
+load("@rules_distroless//distroless:defs.bzl", "flatten")
+load("@rules_shell//shell:sh_binary.bzl", "sh_binary")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(["run_with_runtime.py"])
+
+# Native runtime dependencies from the same pinned package set as the build.
+flatten(
+    name = "test_runtime",
+    testonly = True,
+    deduplicate = True,
+    tars = [
+        "@trixie//libboost-serialization-dev",
+        "@trixie//libhiredis-dev",
+        "@trixie//libzmq3-dev",
+        "@trixie//python3-dev",
+        "@trixie//uuid-dev",
+    ] + select({
+        "//tools/bazel:yang_modules_enabled": ["@libyang//:libyang_pkg"],
+        "//conditions:default": [],
+    }),
+)
+
+sh_binary(
+    name = "run_with_runtime",
+    testonly = True,
+    srcs = ["run_with_runtime.py"],
+)

@@ -1,4 +1,5 @@
 # load("@rules_cc//cc:cc_test.bzl", "cc_test")
+# load("@rules_shell//shell:sh_test.bzl", "sh_test")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -62,7 +63,39 @@ cc_test(
     deps = ["//:libswsscommon_shared"],
 )
 
-# Compile the no-YANG test sources from tests/Makefile.am for CodeQL. The
+cc_binary(
+    name = "defaultvalueprovider_ut_binary",
+    testonly = True,
+    srcs = ["defaultvalueprovider_ut.cpp"],
+    linkstatic = False,
+    target_compatible_with = select({
+        "//tools/bazel:yang_modules_enabled": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    deps = [
+        "//:libswsscommon_shared",
+        "@com_google_googletest//:gtest",
+        "@com_google_googletest//:gtest_main",
+    ],
+)
+
+# DefaultValueProvider ignores symlinks while walking the model directory.
+# The runner copies declared fixtures to regular files under TEST_TMPDIR.
+sh_test(
+    name = "defaultvalueprovider_ut",
+    srcs = ["defaultvalueprovider_ut.sh"],
+    args = ["$(location :defaultvalueprovider_ut_binary)"],
+    data = [":defaultvalueprovider_ut_binary"] + glob([
+        "yang/*.yang",
+        "yang-missing-ref/*.yang",
+    ]),
+    target_compatible_with = select({
+        "//tools/bazel:yang_modules_enabled": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+)
+
+# Compile the selected test sources from tests/Makefile.am for CodeQL. The
 # regular Bazel tests above cover a smaller set that runs without Redis.
 cc_library(
     name = "codeql_test_sources",
@@ -70,7 +103,10 @@ cc_library(
     srcs = glob(
         ["*.cpp"],
         exclude = ["defaultvalueprovider_ut.cpp"],
-    ),
+    ) + select({
+        "//tools/bazel:yang_modules_enabled": ["defaultvalueprovider_ut.cpp"],
+        "//conditions:default": [],
+    }),
     hdrs = ["logger_ut.h"],
     copts = ["-fno-access-control"],
     tags = ["manual"],
