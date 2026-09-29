@@ -30,13 +30,13 @@ echo '#endif'
     }),
 )
 
-# The standalone Bazel 8 path prepares the production model set and runs the
+# The standalone Bazel 8 path consumes the registry model set and runs the
 # same Python schema generator as Make. Bazel 6 callers can continue to supply
 # a Make-generated header through --//tools/bazel:cfg_schema.
 cfg_schema(
     name = "cfg_schema_generated",
     out = "cfg_schema_generated.h",
-    models = "//tools/bazel/yang:yang_models",
+    models = "@sonic_yang_models//:yang_models",
 )
 
 alias(

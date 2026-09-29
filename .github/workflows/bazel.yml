@@ -61,11 +61,6 @@ jobs:
           //dist:libswsscommon_pkg.debug_symbols
           //dist:sonic-db-cli_pkg
           //pyext:swsscommon_pkg
-          //tools/bazel/yang:yang_models_dependency_pkg
-          //dist:libyang_dependency_pkg
-          //dist:libyang_dependency_pkg.debug_symbols
-          @libyang//:libyang_test
-          @libyang//:libyang_package_test
           //goext:swsscommon
           //goext:swsscommon_runtime_test
           //tests:status_code_util_test
@@ -77,9 +72,6 @@ jobs:
           //tests:defaultvalueprovider_ut
           //dist:libswsscommon_package_test
           //pyext:swsscommon_package_test
-          //tools/bazel/yang:yang_models_dependency_package_test
-          @libyang_python//:libyang_runtime_test
-          @libyang_python//:libyang_upstream_test
 
       - name: Collect YANG package artifacts
         run: |
@@ -89,9 +81,6 @@ jobs:
             bazel-bin/dist/libswsscommon_pkg.debug_symbols.tar \
             bazel-bin/dist/sonic-db-cli_pkg.tar \
             bazel-bin/pyext/swsscommon_pkg.tar.gz \
-            bazel-bin/tools/bazel/yang/yang_models_dependency_pkg.tar \
-            bazel-bin/dist/libyang_dependency_pkg.tar \
-            bazel-bin/dist/libyang_dependency_pkg.debug_symbols.tar \
             artifacts/yang/
 
       - name: Build and test without YANG

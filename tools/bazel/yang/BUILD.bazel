@@ -1,70 +1,11 @@
 load("@rules_python//python:py_binary.bzl", "py_binary")
-load("@rules_python//python:py_test.bzl", "py_test")
-load("@tar.bzl", "mtree_mutate", "mtree_spec", "tar")
-load(":cfg_schema.bzl", "prepared_yang_models")
 
 package(default_visibility = ["//visibility:public"])
-
-exports_files([
-    "requirements_lock.txt",
-    "sonic_yang_sources.BUILD.bazel",
-])
-
-py_binary(
-    name = "prepare_yang_models",
-    srcs = ["prepare_yang_models.py"],
-    python_version = "3.13",
-    deps = [
-        "@swss_yang_pip//jinja2",
-        "@swss_yang_pip//pytest_runner",
-        "@swss_yang_pip//setuptools",
-        "@swss_yang_pip//wheel",
-    ],
-)
-
-prepared_yang_models(
-    name = "yang_models",
-    readme = "@swss_yang_sources//:src/sonic-yang-models/README.rst",
-    setup = "@swss_yang_sources//:src/sonic-yang-models/setup.py",
-    sources = ["@swss_yang_sources//:yang_model_sources"],
-)
 
 py_binary(
     name = "gen_cfg_schema",
     srcs = ["//:gen_cfg_schema.py"],
     main = "//:gen_cfg_schema.py",
     python_version = "3.13",
-    deps = ["@swss_yang_sources//:sonic_yang_mgmt"],
-)
-
-mtree_spec(
-    name = "yang_models_dependency_mtree_base",
-    srcs = [":yang_models"],
-)
-
-mtree_mutate(
-    name = "yang_models_dependency_mtree",
-    mtree = ":yang_models_dependency_mtree_base",
-    package_dir = "usr/local/yang-models",
-    strip_prefix = "tools/bazel/yang/yang_models",
-)
-
-tar(
-    name = "yang_models_dependency_pkg",
-    srcs = [":yang_models"],
-    mtree = ":yang_models_dependency_mtree",
-)
-
-py_test(
-    name = "yang_models_dependency_package_test",
-    srcs = ["yang_models_dependency_package_test.py"],
-    args = [
-        "$(location :yang_models_dependency_pkg)",
-        "$(location :yang_models)",
-    ],
-    data = [
-        ":yang_models",
-        ":yang_models_dependency_pkg",
-    ],
-    python_version = "3.13",
+    deps = ["@sonic_yang_mgmt"],
 )

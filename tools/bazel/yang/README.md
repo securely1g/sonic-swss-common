@@ -1,94 +1,70 @@
-# Bazel YANG inputs
+# Common schema generation
 
-This package supplies the model preparation and schema-generation tools for the
-standalone Bazel 8 build. The public build option and header override remain in
-`//tools/bazel`.
+This package runs Common's unchanged `gen_cfg_schema.py` to generate
+`cfg_schema.h`. Reusable YANG libraries, model preparation, dependency packages,
+and their standalone tests belong to the SONiC Bazel registry.
 
 ## Source contract
 
-`MODULE.bazel` pins the following inputs with archive hashes:
+`MODULE.bazel` selects these registry modules:
 
-- The models, templates, and `sonic_yang` Python modules come from
-  `securely1g/sonic-buildimage` revision
-  [`9ab452d22773c41783092ae3bd6c206d6c257c8d`](https://github.com/securely1g/sonic-buildimage/tree/9ab452d22773c41783092ae3bd6c206d6c257c8d).
-- The shared SONiC Bazel registry supplies `libyang-python` module
-  `3.1.0-sonic.1`. It builds CESNET/libyang-python `v3.1.0` with the same four
-  patches as the production
-  [`src/libyang3-py3/Makefile`](https://github.com/securely1g/sonic-buildimage/blob/9ab452d22773c41783092ae3bd6c206d6c257c8d/src/libyang3-py3/Makefile)
-  and owns CFFI source generation, the Python library, and binding tests. Its
-  [module README](https://github.com/securely1g/sonic-bazel-registry/blob/eaab75b50acaa50d08596d57fc6bcbd6ba0e3f1d/modules/libyang-python/3.1.0-sonic.1/README.md)
-  records patch provenance and strict patch application. This first SONiC
-  registry revision selects the merged native CPU hardening fix. Renumbering
-  the unmerged registry candidate leaves its source, production patches, build
-  rules, and dependencies unchanged.
-- The shared SONiC Bazel registry supplies source-built `libyang` module
-  `3.12.2.sonic.1`. It compiles libyang `3.12.2` with the production
-  `LYD_VALIDATE_NOEXTDEPS` patch from that same buildimage revision and enables
-  large-file support. Its PCRE2 `10.45` and xxHash `0.8.3` dependencies are
-  source-built and statically linked into `libyang.so.3`; no distro libyang or
-  separate libxxhash shared object is used. Public headers and the CFFI binding
-  resolve the same module in their respective target/execution configurations.
-- `requirements.in` and `requirements_lock.txt` pin the remaining Python
-  dependencies for schema and model preparation, including the setup
-  requirements used by the model package.
+- [`sonic-yang-models` `1.0.0-9ab452d22773c41783092ae3bd6c206d6c257c8d`](https://github.com/securely1g/sonic-bazel-registry/blob/645a6ebc497116210527410f978f6855db7c792d/modules/sonic-yang-models/1.0.0-9ab452d22773c41783092ae3bd6c206d6c257c8d/README.md)
+  owns the production model sources/templates, setup manifest, preparation
+  action, runtime package, and model/package checks. Common consumes its
+  `@sonic_yang_models//:yang_models` directory.
+- [`sonic-yang-mgmt` `1.0.0-9ab452d22773c41783092ae3bd6c206d6c257c8d`](https://github.com/securely1g/sonic-bazel-registry/blob/645a6ebc497116210527410f978f6855db7c792d/modules/sonic-yang-mgmt/1.0.0-9ab452d22773c41783092ae3bd6c206d6c257c8d/README.md)
+  supplies the `sonic_yang` Python modules through
+  `@sonic_yang_mgmt//:sonic_yang_mgmt`. It owns the library's Python dependencies
+  and its standalone runtime test.
+- Native [`libyang` `3.12.2.sonic.1`](https://github.com/securely1g/sonic-bazel-registry/blob/645a6ebc497116210527410f978f6855db7c792d/modules/libyang/3.12.2.sonic.1/README.md)
+  supplies matching headers, `libyang.so.3`, and runtime/debug packages. It
+  preserves the production `LYD_VALIDATE_NOEXTDEPS` patch and large-file support;
+  PCRE2 and xxHash are source-built static implementation dependencies.
 
-The standalone Azure build uses a different Python binding input:
-[`build-env/packages/base.yaml`](../../../build-env/packages/base.yaml) installs
-`libyang==3.3.0` from pip after installing native libyang packages. The Bazel
-generator follows the production buildimage `v3.1.0` plus patches contract.
+Both SONiC YANG modules use production buildimage revision
+[`9ab452d22773c41783092ae3bd6c206d6c257c8d`](https://github.com/securely1g/sonic-buildimage/tree/9ab452d22773c41783092ae3bd6c206d6c257c8d).
+The management module depends on registry
+[`libyang-python` `3.1.0-sonic.1`](https://github.com/securely1g/sonic-bazel-registry/blob/645a6ebc497116210527410f978f6855db7c792d/modules/libyang-python/3.1.0-sonic.1/README.md),
+which builds CESNET/libyang-python `v3.1.0` with the four patches used by the
+production `src/libyang3-py3/Makefile`. The registry owns CFFI generation and the
+binding's dependencies and tests. This differs from standalone Azure's
+[`build-env/packages/base.yaml`](../../../build-env/packages/base.yaml), which
+installs `libyang==3.3.0` from pip after native libyang packages.
 
-## Preparation and execution
+## Common's generation action
 
-`prepared_yang_models` declares the model package's `setup.py`, `README.rst`,
-raw YANG files, and Jinja templates as inputs. Its execution-side Python tool
-copies those inputs into an isolated directory and runs the existing
-`setup.py build_py` command. That command validates its explicit model manifest
-and renders the `py` and `cvl` template variants. The action publishes the
-`yang-models` directory containing the `py` variant used by the model wheel.
+`cfg_schema` passes the registry's prepared directory to this repository's
+`gen_cfg_schema.py`. The declared Python 3.13 generator and its management
+library run on the execution platform, including their CFFI and native libyang
+inputs. Common's compiled library and packages use the target platform.
 
-`cfg_schema` runs this repository's unchanged `gen_cfg_schema.py` against that
-prepared directory. Its Python 3.13 runtime, Python dependencies, CFFI binding,
-and native libyang dependencies all use Bazel's execution configuration. The
-compiled swsscommon library uses the target configuration. This separation
-keeps schema generation independent of the target CPU.
+The action declares the model directory and generator runfiles as inputs,
+requests network blocking, and disables package-installer network access.
+Dependency sources and locked Python wheels are fetched during Bazel resolution.
+The `../swig.bzl` interface adapter preserves Common's enabled/disabled feature
+defines and generated Python/Go API behavior.
 
-The registry binding uses `current_py_cc_headers` from the selected Python
-toolchain. It resolves Python symbols from that interpreter and has no dynamic
-dependency on a second Python runtime. The pinned infrastructure revision does
-not add `/lib/<multiarch>` or `/usr/lib/<multiarch>/gconv` to runtime search
-paths. The private CFFI extension uses declared Bazel runfiles without a feature
-override. The module runtime test checks the loaded extension, CFFI backend, and
-native libyang against the declared runfiles. The upstream binding suite covers
-its schema and data APIs. PCRE2 and xxHash are static implementation
-dependencies, so they do not need separate shared-library runfiles. The deployed
-swsscommon Python package keeps its target-platform Python dependency.
+## Deployment and validation
 
-The actions pass an offline package-installer environment and request network
-blocking. Python dependencies and the CFFI source generator are declared Bazel
-tools; model and template files are declared action inputs. The source archives
-and locked Python wheels are downloaded during dependency resolution.
+Common publishes its own runtime, debug, CLI, and Python archives. Enabled
+deployments additionally need the model and libyang runtime packages supplied
+by the [registry workflows](https://github.com/securely1g/sonic-bazel-registry/actions):
+`@sonic_yang_models//:yang_models_pkg`, `@libyang//:libyang_pkg`, and libyang's
+matching `@libyang//:libyang_pkg.debug_symbols`. Use the selected module versions
+and deployment architecture. Download the matching
+`registry-ci-<module>-<version>-<architecture>` artifact (`amd64` or `arm64`)
+from **Registry CI** and use `outputs.json` to locate the files under `outputs/`.
+Keep the runtime/debug pair from the same run. The model package installs
+`/usr/local/yang-models`; production Make provides that payload through the
+`sonic_yang_models` wheel.
 
-`../swig.bzl` supplies a declared interface adapter for the YANG feature define.
-The SWIG action also declares the original interface as an input. The adapter
-supports defines and undefines for preprocessor settings.
+Registry CI owns each dependency's package/runtime tests. Common CI retains
+schema generation, feature fixtures, and Common's runtime/package tests. Its
+Python and Go tests stage the pinned libyang package, preload the exact extracted
+SONAME, and check loaded paths. This ensures the enabled mode uses the packaged
+dependency and the disabled mode does not load it.
 
-## Runtime model dependency
-
-`yang_models_dependency_pkg.tar` installs the prepared model tree at
-`/usr/local/yang-models`. This is the runtime payload supplied by the production
-`sonic_yang_models` wheel, packaged separately from swsscommon's runtime tar.
-Enabled deployments install it alongside `libswsscommon_pkg.tar`,
-`libyang_dependency_pkg.tar`, and the remaining Trixie runtime libraries.
-The libyang dependency package and `libyang_dependency_pkg.debug_symbols.tar`
-come from the same linked ELF through the shared debug-packaging rule.
-The model package test compares every archived model byte with the prepared
-tree and checks the installed path.
-
-When updating these pins, compare the prepared model tree and generated header
-with the Make path and run the enabled and disabled target lists in
-[`docs/bazel.md`](../../../docs/bazel.md).
-
-The staged Python/Go package tests preload the exact extracted libyang SONAME.
-Bazel's embedded `DT_RPATH` would otherwise take precedence over
-`LD_LIBRARY_PATH` and could select the build-tree copy. The tests retain their
-loaded-path checks, so this validates the deployed payload explicitly.
+When updating inputs, compare the generated header with the existing production
+contract and run Common's enabled/disabled target lists in
+[`docs/bazel.md`](../../../docs/bazel.md). Registry module checks validate the
+reusable model payload and library independently.

@@ -55,15 +55,7 @@ targets=(
 
 yang_targets=(
   //common:cfg_schema_generated
-  //tools/bazel/yang:yang_models_dependency_pkg
-  //dist:libyang_dependency_pkg
-  //dist:libyang_dependency_pkg.debug_symbols
-  @libyang//:libyang_test
-  @libyang//:libyang_package_test
   //tests:defaultvalueprovider_ut
-  //tools/bazel/yang:yang_models_dependency_package_test
-  @libyang_python//:libyang_runtime_test
-  @libyang_python//:libyang_upstream_test
 )
 
 # Native AMD64, YANG enabled (the default)
@@ -114,16 +106,29 @@ Every download contains these four archives:
 - `sonic-db-cli_pkg.tar`: database CLI.
 - `swsscommon_pkg.tar.gz`: Python bindings.
 
-The YANG downloads also contain `yang_models_dependency_pkg.tar`,
-`libyang_dependency_pkg.tar`, and `libyang_dependency_pkg.debug_symbols.tar`.
-Install the model and libyang runtime archives with `libswsscommon_pkg.tar`
-for enabled deployments, together with the remaining Trixie runtime libraries.
-Keep the libyang symbol archive with its matching runtime for debugging.
-The model archive installs the prepared models at
-`/usr/local/yang-models`, the path used by `DefaultValueProvider`. Production
-Make supplies this dependency through the `sonic_yang_models` wheel; the Bazel
-archive carries that wheel's model payload for deployments using these tar
-archives. The Python bindings archive is needed by Python consumers.
+### Dependency runtime packages
+
+Common's artifacts contain its own library, bindings, CLI, and symbols. Enabled
+deployments also require packages owned by the
+[SONiC Bazel registry](https://github.com/securely1g/sonic-bazel-registry/actions):
+
+- `sonic-yang-models`: `//:yang_models_pkg` installs the prepared model payload
+  under `/usr/local/yang-models`, the path used by `DefaultValueProvider`.
+- `libyang`: `//:libyang_pkg` supplies the native runtime, and
+  `//:libyang_pkg.debug_symbols` supplies its matching detached symbols.
+
+Select a successful **Registry CI** workflow for the module versions pinned
+by this build and download `registry-ci-<module>-<version>-<architecture>`
+(`amd64` or `arm64`). Its `outputs.json` maps declared build targets to retained
+files under `outputs/`, including their hashes. Keep each runtime/debug pair
+from the same run. Registry module READMEs linked in the
+[YANG input guide](../tools/bazel/yang/README.md) document the package targets.
+Common CI does not copy or upload these dependency archives. Its staged Python
+and Go tests still consume the pinned libyang runtime to verify integration.
+Install the model and libyang runtime with Common's runtime archive and the
+remaining Trixie runtime libraries. The Python bindings archive is required by
+Python consumers. Production Make supplies the models through the
+`sonic_yang_models` wheel; the registry tar carries the same model payload.
 
 The standalone build produces tar archives. Debian dependency metadata, the
 `libswsscommon-dev` package, and wheel packaging remain owned by the Make
@@ -167,13 +172,13 @@ constants through the Python bindings. The disabled setting selects the minimal
 schema stub and omits the YANG native sources, libyang dependency, and Python
 API entries.
 
-The model preparation action runs the production `sonic-yang-models/setup.py`
-with its declared manifest, raw models, templates, and locked Python tools in an
-isolated directory. The unchanged `gen_cfg_schema.py` then consumes that model
-directory. Both tools run on the execution platform, including their Python
-3.13 and libyang inputs; the library's native dependencies follow the target
-platform. These actions declare their inputs and request network blocking, with
-package installer network access disabled.
+Registry module `sonic-yang-models` prepares the production model set with its
+manifest, raw models, templates, and locked Python tools. Common's unchanged
+`gen_cfg_schema.py` consumes that prepared directory through the registry's
+`sonic-yang-mgmt` Python library. Schema generation runs on the execution
+platform, including its Python 3.13 and libyang inputs; the library's native
+dependencies follow the target platform. The generator declares its inputs and
+requests network blocking, with package installer network access disabled.
 
 The source revisions, libyang-Python patch provenance, and the difference from
 the standalone Azure build inputs are recorded in the
@@ -182,15 +187,15 @@ the standalone Azure build inputs are recorded in the
 6 builds that supply a Make-generated header. Standalone Bazel 8 uses a selected
 default header for the enabled and disabled modes.
 
-The enabled C++ fixture test loads models through the shared library. Package
-tests check the native feature symbols, import and construct the enabled Python
-class from the archive, and verify the model archive's installed path and bytes.
-The libyang runtime test checks that source-built libyang loads from declared
-runfiles; PCRE2 and xxHash are statically linked implementation dependencies.
-The registry package test checks its SONAME, symlinks, detached-symbol pairing,
-and GDB source lookup. The Python package and Go consumer tests stage the same
-source-built libyang and pinned Trixie runtime packages used by the build.
-The Go test exercises
+Common CI checks the integration with these dependencies. The enabled C++
+fixture loads models through the shared library; package tests check native
+feature symbols and import and construct the enabled Python class from the
+archive. Registry CI independently checks the model package, management
+library, libyang runtime/package, and Python binding. PCRE2 and xxHash remain
+static implementation dependencies of native libyang.
+
+The Python package and Go consumer tests stage the same source-built libyang
+and pinned Trixie runtime packages used by the build. The Go test exercises
 wrapped value types and calls `Select` in the current shared library without
 Redis. It checks that the current library is loaded and that hiredis and the
 enabled mode's libyang come from the staged runtime; disabled mode must not load

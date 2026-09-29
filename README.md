@@ -82,22 +82,22 @@ bazel build --//tools/bazel:yang_modules=True \
   //dist:libswsscommon_pkg \
   //dist:libswsscommon_pkg.debug_symbols \
   //dist:sonic-db-cli_pkg \
-  //pyext:swsscommon_pkg \
-  //tools/bazel/yang:yang_models_dependency_pkg \
-  //dist:libyang_dependency_pkg \
-  //dist:libyang_dependency_pkg.debug_symbols
+  //pyext:swsscommon_pkg
 ```
 
 For native ARM64, add `--config=aarch64` after `build`. The package archives
 are written to `bazel-bin/dist/libswsscommon_pkg.tar`,
 `bazel-bin/dist/libswsscommon_pkg.debug_symbols.tar`,
 `bazel-bin/dist/sonic-db-cli_pkg.tar`, and
-`bazel-bin/pyext/swsscommon_pkg.tar.gz`. The enabled build also writes
-`bazel-bin/tools/bazel/yang/yang_models_dependency_pkg.tar`; install this model
-payload with `bazel-bin/dist/libyang_dependency_pkg.tar` and the runtime archive.
-Keep `bazel-bin/dist/libyang_dependency_pkg.debug_symbols.tar` for debugging
-that exact libyang build. To build without YANG, pass
-`--//tools/bazel:yang_modules=False` and omit the model and libyang package targets.
+`bazel-bin/pyext/swsscommon_pkg.tar.gz`. To build without YANG, pass
+`--//tools/bazel:yang_modules=False`.
+
+Enabled deployments also need the prepared models under `/usr/local/yang-models`
+and the matching native libyang runtime. These dependencies are built, tested,
+and published by the [SONiC Bazel registry](https://github.com/securely1g/sonic-bazel-registry/actions),
+separately from Common's four package archives. Use the module versions selected
+by `MODULE.bazel` and retain libyang's matching debug archive. See the
+[deployment inputs](docs/bazel.md#dependency-runtime-packages) for details.
 
 The runtime package contains the library and `swssloglevel` with their debug
 information removed. The matching detached information is in

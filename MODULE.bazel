@@ -23,9 +23,10 @@ bazel_dep(name = "platforms", version = "1.1.0")
 bazel_dep(name = "tar.bzl", version = "0.10.5")
 bazel_dep(name = "rules_distroless", version = "0.9.4")
 bazel_dep(name = "libyang", version = "3.12.2.sonic.1")
-bazel_dep(name = "libyang-python", version = "3.1.0-sonic.1", repo_name = "libyang_python")
 bazel_dep(name = "libnl3", version = "3.7.0.sonic-buildimage")
 bazel_dep(name = "sonic-build-infra", version = "0.0.6-553b2f70f9ba77b74befdf77674894166139ddcc", repo_name = "sonic_build_infra")
+bazel_dep(name = "sonic-yang-mgmt", version = "1.0.0-9ab452d22773c41783092ae3bd6c206d6c257c8d", repo_name = "sonic_yang_mgmt")
+bazel_dep(name = "sonic-yang-models", version = "1.0.0-9ab452d22773c41783092ae3bd6c206d6c257c8d", repo_name = "sonic_yang_models")
 
 # Schema generation runs on the execution platform with a declared Python
 # runtime. Its native CFFI binding uses headers from that interpreter toolchain.
@@ -34,28 +35,6 @@ python.toolchain(python_version = "3.13")
 use_repo(python, "python_3_13")
 
 register_toolchains("@python_3_13//:all")
-
-pip = use_extension("@rules_python//python/extensions:pip.bzl", "pip")
-pip.parse(
-    hub_name = "swss_yang_pip",
-    python_version = "3.13",
-    requirements_lock = "//tools/bazel/yang:requirements_lock.txt",
-)
-use_repo(pip, "swss_yang_pip")
-
-# Production Make inputs from securely1g/sonic-buildimage master. The model
-# manifest, templates, and sonic_yang modules are kept at one source revision.
-# This repository only adds Bazel build metadata; the source inputs remain the
-# same as the production Make path.
-http_archive = use_repo_rule("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
-
-http_archive(
-    name = "swss_yang_sources",
-    build_file = "//tools/bazel/yang:sonic_yang_sources.BUILD.bazel",
-    sha256 = "006f73ee4e03bbfb1cf03910ebabdc2c0798f64098b1379777c9f70d5e538555",
-    strip_prefix = "sonic-buildimage-9ab452d22773c41783092ae3bd6c206d6c257c8d",
-    urls = ["https://github.com/securely1g/sonic-buildimage/archive/9ab452d22773c41783092ae3bd6c206d6c257c8d.tar.gz"],
-)
 
 gcc = use_extension("@sonic_build_infra//toolchains/gcc:extensions.bzl", "gcc")
 use_repo(gcc, "gcc_toolchains")
