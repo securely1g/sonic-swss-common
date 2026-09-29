@@ -1,0 +1,29 @@
+load("@rules_cc//cc:defs.bzl", "cc_library")
+load("@rules_rust_bindgen//:defs.bzl", "rust_bindgen")
+load("//tools/bazel/rust:bindings.bzl", "bindings_directory", "c_api_header")
+
+c_api_header(
+    name = "c_api_header",
+)
+
+cc_library(
+    name = "c_api_bindgen_input",
+    hdrs = [":c_api_header"],
+    deps = ["//:libswsscommon_shared"],
+)
+
+rust_bindgen(
+    name = "bindings",
+    bindgen_flags = ["--with-derive-partialeq"],
+    cc_lib = ":c_api_bindgen_input",
+    header = ":c_api_header",
+    merge_cc_lib_objects_into_rlib = False,
+)
+
+# crate_universe consumers use this directory as Cargo's OUT_DIR after
+# disabling build.rs. The native library must come from this same module.
+bindings_directory(
+    name = "bindings_dir",
+    src = ":bindings.rs",
+    visibility = ["//visibility:public"],
+)
