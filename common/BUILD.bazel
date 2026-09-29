@@ -1,13 +1,12 @@
+load("//tools/bazel:bzlmod.bzl", "IS_BZLMOD")
+load("//tools/bazel/yang:cfg_schema.bzl", "cfg_schema")
+
 package(default_visibility = ["//visibility:public"])
 
 # The minimal cfg_schema.h that `./configure --disable-yangmodules` produces.
 # The CFG_*_TABLE_NAME macros the library itself uses remain defined inline in schema.h.
 #
-# This is the default value for --//tools/bazel:cfg_schema.
-#
-# TODO(bazel-ready): Wire up YANG-driven generation (gen_cfg_schema.py) to Bazel.
-# it needs the YANG toolchain plus a python toolchain, which are not migrated yet.
-# Until then, mark this stub as incompatible with YANG modules enabled.
+# The no-YANG configuration selects this through :cfg_schema_default.
 genrule(
     name = "cfg_schema_stub",
     outs = ["cfg_schema_stub.h"],
@@ -28,6 +27,23 @@ echo '#endif'
     target_compatible_with = select({
         "//tools/bazel:yang_modules_enabled": ["@platforms//:incompatible"],
         "//conditions:default": [],
+    }),
+)
+
+# The standalone Bazel 8 path consumes the registry model set and runs the
+# same Python schema generator as Make. Bazel 6 callers can continue to supply
+# a Make-generated header through --//tools/bazel:cfg_schema.
+cfg_schema(
+    name = "cfg_schema_generated",
+    out = "cfg_schema_generated.h",
+    models = "@sonic_yang_models//:yang_models",
+)
+
+alias(
+    name = "cfg_schema_default",
+    actual = select({
+        "//tools/bazel:yang_modules_enabled": ":cfg_schema_generated" if IS_BZLMOD else ":cfg_schema_stub",
+        "//conditions:default": ":cfg_schema_stub",
     }),
 )
 
