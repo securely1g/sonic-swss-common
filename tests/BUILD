@@ -81,14 +81,20 @@ cc_binary(
 
 # DefaultValueProvider ignores symlinks while walking the model directory.
 # The runner copies declared fixtures to regular files under TEST_TMPDIR.
+# Pass each path explicitly so the test also works from an external consumer.
+_DEFAULTVALUE_FIXTURES = glob([
+    "yang/*.yang",
+    "yang-missing-ref/*.yang",
+])
+
 sh_test(
     name = "defaultvalueprovider_ut",
     srcs = ["defaultvalueprovider_ut.sh"],
-    args = ["$(location :defaultvalueprovider_ut_binary)"],
-    data = [":defaultvalueprovider_ut_binary"] + glob([
-        "yang/*.yang",
-        "yang-missing-ref/*.yang",
-    ]),
+    args = ["$(location :defaultvalueprovider_ut_binary)"] + [
+        "$(location %s)" % fixture
+        for fixture in _DEFAULTVALUE_FIXTURES
+    ],
+    data = [":defaultvalueprovider_ut_binary"] + _DEFAULTVALUE_FIXTURES,
     target_compatible_with = select({
         "//tools/bazel:yang_modules_enabled": [],
         "//conditions:default": ["@platforms//:incompatible"],
