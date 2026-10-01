@@ -90,15 +90,23 @@ filegroup(
 # c-api/ is spelled out for the same reason as in :srcs above. These install as
 # swss/c-api/*.h, matching the layout of the libswsscommon-dev deb.
 filegroup(
+    name = "c_api_hdrs",
+    srcs = glob(["c-api/*.h"]),
+    visibility = ["//crates/swss-common:__pkg__"],
+)
+
+filegroup(
     name = "hdrs",
     srcs = glob(
         [
             "*.h",
             "*.hpp",
-            "c-api/*.h",
         ],
         allow_empty = True,
-    ) + [":cfg_schema_h"],
+    ) + [
+        ":c_api_hdrs",
+        ":cfg_schema_h",
+    ],
 )
 
 # swssloglevel standalone tool sources.
