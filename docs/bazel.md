@@ -266,7 +266,7 @@ interfaces, output paths, packaging, and runtime tests. Its small
 in Bzlmod builds and selects their outputs. The native calls retain the default
 64-bit behavior, and WORKSPACE builds still skip the ARMHF declarations. Bzlmod
 source overrides must provide the shared sysroot and SWIG APIs from the pinned
-0.0.7 infrastructure release or a compatible newer version.
+0.0.9 infrastructure release or a compatible newer version.
 The ARMHF Go link selects lld and PIE mode so Go emits position-independent
 objects for LLVM's PIE executable link; native paths retain bfd and their
 existing Go link mode. The Go host wrapper selects its explicit QEMU mode for

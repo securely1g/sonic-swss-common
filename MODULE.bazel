@@ -24,7 +24,7 @@ bazel_dep(name = "tar.bzl", version = "0.10.5")
 bazel_dep(name = "rules_distroless", version = "0.9.4.sonic.2")
 bazel_dep(name = "libyang", version = "3.12.2.sonic.1")
 bazel_dep(name = "libnl3", version = "3.7.0.sonic-buildimage")
-bazel_dep(name = "sonic-build-infra", version = "0.0.7-91fe8246519f99838da936eee54e85208c704a4d", repo_name = "sonic_build_infra")
+bazel_dep(name = "sonic-build-infra", version = "0.0.9-c4175cb61c79b3b7b70901724fddbe2cd35ff86d", repo_name = "sonic_build_infra")
 bazel_dep(name = "sonic-yang-mgmt", version = "1.0.0-9ab452d22773c41783092ae3bd6c206d6c257c8d", repo_name = "sonic_yang_mgmt")
 bazel_dep(name = "sonic-yang-models", version = "1.0.0-9ab452d22773c41783092ae3bd6c206d6c257c8d", repo_name = "sonic_yang_models")
 
