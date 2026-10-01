@@ -314,3 +314,13 @@ errors when GCC compiles the generated code. The directives in
 Python uses `%naturalvar` to retain class attributes with value-style wrapping,
 while Go uses explicit `%extend` getters and `%ignore` for the problematic
 automatic wrappers. `%naturalvar` alone does not correct the Go-generated code.
+
+### Required architecture checks
+
+The required `Bazel (AMD64)` check is a completion gate for both native matrix
+jobs and the ARM64-hosted ARMHF job. Its native AMD64 compilation job is shown
+as `Bazel native (AMD64)`; `Bazel (ARM64)` and `Bazel (ARMHF)` retain their names.
+The gate runs even when a dependency fails or is skipped and passes only when
+all supported jobs succeed, including both YANG configurations. This preserves
+the required context used by older documentation branches while enforcing the
+ARMHF coverage introduced here.

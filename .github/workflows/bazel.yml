@@ -12,16 +12,18 @@ permissions:
 
 jobs:
   build-and-test:
-    name: Bazel (${{ matrix.arch }})
+    name: ${{ matrix.check_name }}
     timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
         include:
           - arch: AMD64
+            check_name: Bazel native (AMD64)
             runner: ubuntu-24.04
             bazel_args: ""
           - arch: ARM64
+            check_name: Bazel (ARM64)
             runner: ubuntu-24.04-arm
             bazel_args: --config=aarch64
     runs-on: ${{ matrix.runner }}
@@ -266,3 +268,19 @@ jobs:
           name: sonic-swss-common-no-yang-ARMHF
           path: artifacts/no-yang/
           if-no-files-found: error
+
+  required-builds:
+    # Preserve the required context used by master and documentation branches,
+    # while making this branch's added ARMHF configuration a merge prerequisite.
+    name: Bazel (AMD64)
+    if: always()
+    needs: [build-and-test, armhf]
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Require every supported build and test job to pass
+        env:
+          NATIVE_RESULT: ${{ needs.build-and-test.result }}
+          ARMHF_RESULT: ${{ needs.armhf.result }}
+        run: |
+          test "$NATIVE_RESULT" = success
+          test "$ARMHF_RESULT" = success
