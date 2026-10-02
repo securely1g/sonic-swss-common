@@ -152,6 +152,21 @@ def bep_metrics(path):
     return metrics
 
 
+def package_differences(reference, candidate, check):
+    differences = []
+    for expected, observed in zip(reference["invocations"], candidate["invocations"]):
+        for package, digest in expected["package_sha256"].items():
+            actual = observed["package_sha256"].get(package)
+            if digest != actual:
+                differences.append({
+                    "check": check, "reference_case": reference["name"],
+                    "candidate_case": candidate["name"], "yang": expected["yang"],
+                    "package": package, "reference_sha256": digest,
+                    "candidate_sha256": actual,
+                })
+    return differences
+
+
 def execute(command, cwd, environment, log, timeout):
     started = time.monotonic()
     timed_out = False
@@ -328,30 +343,40 @@ def run(args, secret):
             shutil.rmtree(private / f"{case}-disk", ignore_errors=True)
         if args.mode == "compare":
             baseline, remote = summary["cases"][0], summary["cases"][-1]
+            populate, remote_only = summary["cases"][1:3]
             hits = sum(call["cache_metrics"]["remote_cache_hits"]
                        for call in remote["invocations"])
             diagnostic_hits = sum(call["cache_metrics"]["remote_cache_hits"]
-                                  for call in summary["cases"][2]["invocations"])
+                                  for call in remote_only["invocations"])
             summary["remote_reuse_observed"] = hits > 0
-            summary["package_hashes_match"] = all(
-                reference["package_sha256"] == candidate["package_sha256"]
-                for case in summary["cases"][1:]
-                for reference, candidate in zip(baseline["invocations"], case["invocations"])
-            )
+            summary["package_mismatches"] = []
+            for check, field, reference, candidate in (
+                ("primary", "primary_output_match", baseline, remote),
+                ("remote_roundtrip", "remote_roundtrip_match", populate, remote_only),
+                ("cross_cache", "cross_cache_output_match", baseline, populate),
+            ):
+                differences = package_differences(reference, candidate, check)
+                summary[field] = not differences
+                summary["package_mismatches"].extend(differences)
+            summary["package_hashes_match"] = not summary["package_mismatches"]
+            if diagnostic_hits:
+                # Preserve the observed pair even when a separate cache family differs.
+                summary["comparison"] = {
+                    "baseline_case": "baseline", "remote_case": remote["name"],
+                    "baseline_seconds": baseline["wall_seconds"],
+                    "remote_seconds": remote["wall_seconds"],
+                    "saved_seconds": baseline["wall_seconds"] - remote["wall_seconds"],
+                    "speedup": baseline["wall_seconds"] / remote["wall_seconds"]
+                    if hits and summary["primary_output_match"] and summary["remote_roundtrip_match"]
+                    else None,
+                    "remote_cache_hits": hits,
+                    "remote_only_cache_hits": diagnostic_hits,
+                }
             if not summary["package_hashes_match"] or diagnostic_hits == 0:
                 summary["status"] = ("package_outputs_differ" if not summary["package_hashes_match"]
                                      else "remote_cache_not_verified")
                 save()
                 return 1
-            summary["comparison"] = {
-                "baseline_case": "baseline", "remote_case": remote["name"],
-                "baseline_seconds": baseline["wall_seconds"],
-                "remote_seconds": remote["wall_seconds"],
-                "saved_seconds": baseline["wall_seconds"] - remote["wall_seconds"],
-                "speedup": baseline["wall_seconds"] / remote["wall_seconds"] if hits else None,
-                "remote_cache_hits": hits,
-                "remote_only_cache_hits": diagnostic_hits,
-            }
         summary["status"] = "complete"
         save()
     return 0

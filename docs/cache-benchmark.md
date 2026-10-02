@@ -97,8 +97,16 @@ comparison reports an unverified cache or differing packages for investigation.
 The combined case can legitimately have zero remote hits when the disk cache
 already serves everything. In that case, timing differences are still reported,
 but `remote_reuse_observed` is false and no cache speedup is attributed to
-BuildBuddy. A failed preparation/build stops later cases and keeps the evidence
-already collected.
+BuildBuddy.
+
+Output checks distinguish the primary pair (`primary_output_match`), populate
+versus remote (`remote_roundtrip_match`), and restored-cache baseline versus fresh
+population (`cross_cache_output_match`). Observed primary timings remain available
+when the two pairs each match but their package hashes differ from each other.
+The overall status stays `package_outputs_differ` with a failing exit code, and
+`package_mismatches` records the cases, YANG setting, package and both hashes.
+Matching pairs do not resolve that broader reproducibility concern. A failed
+preparation/build stops later cases and keeps the evidence already collected.
 
 The runner puts the BuildBuddy key in a private temporary rc file. It removes
 credential variables such as `BAZELISK_GITHUB_TOKEN`, `GITHUB_TOKEN` and
