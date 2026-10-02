@@ -384,3 +384,10 @@ errors when GCC compiles the generated code. The directives in
 Python uses `%naturalvar` to retain class attributes with value-style wrapping,
 while Go uses explicit `%extend` getters and `%ignore` for the problematic
 automatic wrappers. `%naturalvar` alone does not correct the Go-generated code.
+
+Each native CI configuration retains its generated `MODULE.bazel.lock`, resolved
+module graph, root module declaration and registry configuration with the package
+artifacts under `resolution/`. The receipt records the source revision, YANG
+mode, runner/userspace architecture, selected target platform and SHA-256 hashes.
+The build's lock is saved before graph collection; `module-graph.lock` records
+any additional graph resolution. These are generated evidence, not tracked inputs.
