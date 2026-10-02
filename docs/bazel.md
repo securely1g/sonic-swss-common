@@ -6,6 +6,15 @@ Dependencies come from the configured SONiC Bazel registry and the Bazel Central
 Registry; the native GCC 14.2 toolchain and Debian package inputs are downloaded
 by Bazel.
 
+This branch uses the shared timestamp rules from `sonic-build-infra`. The local
+registry snapshot is pinned in `.bazelrc`. Until that registration lands, Bazel
+and C++ CodeQL CI replace that single endpoint with the reviewed
+`codex/deterministic-tar-timestamps` registry branch. They retain Bazel Central
+Registry as the separate third-party registry. Package artifacts include the
+effective configuration (`effective.bazelrc`) and generated module lock for
+dependency inspection. After the shared prerequisites land, refresh the local
+snapshot and switch CI back to the registry's canonical `main` branch.
+
 ## Environment
 
 Use a native AMD64 or ARM64 Linux environment with Debian Trixie userspace. The
@@ -51,6 +60,7 @@ targets=(
   //tests:vrf_ut
   //tests:shared_library_runtime_test
   //dist:libswsscommon_package_test
+  //dist:package_timestamps_test
   //pyext:swsscommon_package_test
 )
 
@@ -156,6 +166,16 @@ Python consumers. Production Make supplies the models through the
 The standalone build produces tar archives. Debian dependency metadata, the
 `libswsscommon-dev` package, and wheel packaging remain owned by the Make
 workflow. GitHub requires you to sign in to download workflow artifacts.
+
+### Reproducible package timestamps
+
+`sonic_deploy_tar` supplies missing timestamps in the library package's explicit
+archive entries, and `sonic_tar` does the same for the CLI package. These shared
+rules preserve timestamps explicitly requested by a caller. Common's package
+test checks the actual library, program, configuration and symlink headers;
+timestamp policy and generic reproducibility tests live in `sonic-build-infra`.
+The Lua package already uses tar.bzl's automatically generated manifest, which
+supplies deterministic timestamps.
 
 ## Debug symbols
 
