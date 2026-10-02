@@ -1,9 +1,10 @@
 # CodeQL and Bazel cache reuse
 
-The ordinary [Bazel CI job](../.github/workflows/bazel.yml) caches compiled outputs
-without creating a CodeQL database. The
-[C++ CodeQL job](../.github/workflows/codeql-analysis.yml) rebuilds C/C++ actions so
-CodeQL can observe them. In this manual build configuration, CodeQL records
+The native ARM64 [Bazel CI job](../.github/workflows/bazel.yml) caches compiled
+outputs without creating a CodeQL database. AMD64 compilation, tests and packaging
+share the [C++ CodeQL job](../.github/workflows/codeql-analysis.yml). It builds in
+a fresh output base while CodeQL observes compilation, then reuses those outputs
+for tests and packaging in the same job. In this manual build configuration, CodeQL records
 compilation and linkage facts from build processes. A Bazel cache hit restores
 declared build outputs without running those processes. Ordinary object, library,
 and binary cache entries therefore do not populate the corresponding facts in a
@@ -20,12 +21,19 @@ versions.
 
 The job creates a fresh Bazel output base after CodeQL initialization. This starts
 a new Bazel server with the tracing environment and avoids existing local action
-state. The build uses these controls:
+state. The local action cache starts empty and is populated only by this traced
+job. YANG tests reuse those outputs. The job finalizes analysis and bundles its
+source archive before switching to no-YANG, whose generated files can otherwise
+overwrite paths used for YANG analysis. After analysis, the workflow restores the
+job environment from CodeQL's tracing-environment records and starts a new Bazel
+server. It then builds and tests no-YANG using the same
+private output base. The original YANG-only analysis scope is preserved.
+The build uses these controls:
 
 | Control | Purpose |
 | --- | --- |
 | `--spawn_strategy=local` | Run build processes on the runner where CodeQL tracing is active. |
-| `--nouse_action_cache` | Disable Bazel's local action cache. |
+| Fresh output base and `--use_action_cache` | Reuse only outputs already built inside this traced job/database. |
 | `--disk_cache=` and `--remote_cache=` | Disable disk and remote caches of action outputs. |
 | `--remote_executor=` | Disable remote execution. |
 | `--noremote_accept_cached` and `--noremote_upload_local_results` | Keep the policy for remote caches explicit. |
@@ -37,6 +45,13 @@ and [disk/remote cache policy](https://github.com/bazelbuild/bazel/blob/8.5.1/sr
 Bazelisk and repository download caches remain enabled. They reuse the Bazel
 executable and downloaded dependency archives, while the compiler and linker
 actions still execute under CodeQL.
+
+The job builds the full target union before running tests with
+`--nocache_test_results`. It rejects every test-phase spawn other than a fresh
+test execution and checks that all required tests pass. This proves the tests use
+the existing compiled/package outputs. Build profiles and source-extraction
+receipts are retained with the package hashes. The CodeQL CLI and security query
+suites remain unchanged for this experiment.
 
 ## Local experiment on 2026-09-27
 
@@ -96,8 +111,9 @@ query of `link_parent`, which assigns program elements to link targets, counted
 not established, so analysis parity remains unresolved. A full security query and
 SARIF comparison was not run after these differences were found.
 
-The current workflow retains its existing restrictions on action caches. This
-trial does not justify reusing preparation action outputs yet.
+That trial does not justify restoring preparation outputs from a different job
+into a fresh CodeQL database. Reuse later in the same traced job is different:
+the current database already contains the earlier compiler and linkage facts.
 
 ## What future cache reuse must provide
 
