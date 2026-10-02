@@ -1,0 +1,5 @@
+name: sonic/swss-common-source-coverage
+version: 0.0.1
+dependencies:
+  # Match the pinned CodeQL 2.27.0 bundle used by the C++ workflow.
+  codeql/cpp-all: "12.1.0"
