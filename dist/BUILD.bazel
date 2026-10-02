@@ -2,6 +2,7 @@ load("@bazel_skylib//rules:copy_file.bzl", "copy_file")
 load("@rules_distroless//distroless:defs.bzl", "flatten")
 load("@rules_shell//shell:sh_test.bzl", "sh_test")
 load("@sonic_build_infra//tar:sonic_deploy_tar.bzl", "sonic_deploy_tar")
+load("@sonic_build_infra//tar:sonic_tar.bzl", "sonic_tar")
 load("@tar.bzl", "mtree_mutate", "mtree_spec", "tar")
 
 package(default_visibility = ["//visibility:public"])
@@ -40,6 +41,7 @@ DIST_LOOSE_SRCS = [
     "//common:database_config.json",
 ]
 
+# Shared packaging rules supply deterministic timestamps for explicit entries.
 DIST_LOOSE_COMMON_MTREE = [
     "var/run/redis/sonic-db/database_config.json type=file content=$(location //common:database_config.json)",
 ]
@@ -114,7 +116,7 @@ sh_test(
     ],
 )
 
-tar(
+sonic_tar(
     name = "sonic-db-cli_pkg",
     srcs = [
         "//sonic-db-cli",
@@ -123,4 +125,17 @@ tar(
         "usr/bin/sonic-db-cli type=file mode=0755 content=$(location //sonic-db-cli:sonic-db-cli)",
     ],
     visibility = ["//visibility:public"],
+)
+
+sh_test(
+    name = "package_timestamps_test",
+    srcs = ["package_timestamps_test.sh"],
+    args = [
+        "$(location :libswsscommon_pkg)",
+        "$(location :sonic-db-cli_pkg)",
+    ],
+    data = [
+        ":libswsscommon_pkg",
+        ":sonic-db-cli_pkg",
+    ],
 )
