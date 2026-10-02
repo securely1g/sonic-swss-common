@@ -77,7 +77,11 @@ if "test" in args:
                  "dist/sonic-db-cli_pkg.tar", "pyext/swsscommon_pkg.tar.gz"):
         path = root / "bazel-bin" / name
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_bytes(name.encode())
+        content = name.encode()
+        if (scenario.get("cross_cache_mismatch") and base.name in ("populate", "remote")
+                and name in ("dist/libswsscommon_pkg.tar", "dist/sonic-db-cli_pkg.tar")):
+            content += b":independent-cache"
+        path.write_bytes(content)
 sys.exit(9 if scenario.get("fail") == stem else 0)
 '''
 
@@ -98,10 +102,11 @@ class BenchmarkTests(TestCase):
             bazel=str(executable), remote_cache="grpcs://remote.buildbuddy.io",
             timeout_seconds=10)
 
-    def run_fixture(self, fail=None, zero_hits=False, credentials=None):
+    def run_fixture(self, fail=None, zero_hits=False, credentials=None, cross_cache_mismatch=False):
         credentials = credentials or {}
         (self.root / "scenario.json").write_text(json.dumps({"fail": fail,
-            "zero_hits": zero_hits, "credential_names": list(credentials),
+            "zero_hits": zero_hits, "cross_cache_mismatch": cross_cache_mismatch,
+            "credential_names": list(credentials),
             "credential_values": list(credentials.values())}))
         environment = {"PATH": os.defpath, "BENCHMARK_FIXTURE_VISIBLE": "ordinary-value", **credentials}
         if self.args.mode == "compare":
@@ -234,6 +239,31 @@ class BenchmarkTests(TestCase):
         self.assertEqual((code, summary["status"], calls), (1, "preparation_failed", []))
         self.assertEqual(summary["preparation"][0]["exit_code"], 127)
         self.assertEqual(summary["cases"], [])
+
+    def test_cross_cache_mismatch_preserves_primary_comparison_and_failure(self):
+        self.args.disk_cache = self.root / "restored-cache"
+        self.args.disk_cache.mkdir()
+        code, summary, calls = self.run_fixture(cross_cache_mismatch=True)
+        self.assertEqual((code, summary["status"], len(calls)), (1, "package_outputs_differ", 10))
+        self.assertTrue(summary["primary_output_match"])
+        self.assertTrue(summary["remote_roundtrip_match"])
+        self.assertFalse(summary["cross_cache_output_match"])
+        self.assertFalse(summary["package_hashes_match"])
+        self.assertCountEqual(summary["package_mismatches"], [
+            {"check": "cross_cache", "reference_case": "baseline", "candidate_case": "populate",
+             "yang": yang, "package": package,
+             "reference_sha256": hashlib.sha256(package.encode()).hexdigest(),
+             "candidate_sha256": hashlib.sha256(package.encode() + b":independent-cache").hexdigest()}
+            for yang in (True, False)
+            for package in ("dist/libswsscommon_pkg.tar", "dist/sonic-db-cli_pkg.tar")])
+        comparison = summary["comparison"]
+        self.assertEqual((comparison["baseline_case"], comparison["remote_case"]), ("baseline", "combined"))
+        self.assertEqual((comparison["baseline_seconds"], comparison["remote_seconds"]), (4, 4))
+        self.assertEqual(comparison["saved_seconds"], 0)
+        self.assertEqual(comparison["remote_cache_hits"], 0)
+        self.assertEqual(comparison["remote_only_cache_hits"], 10)
+        self.assertIsNone(comparison["speedup"])
+        self.assert_private_evidence(calls)
 
     def test_cli_rejects_missing_compare_credential_before_run(self):
         argv = ["benchmark", "--mode", "compare", "--arch", "AMD64", "--output-dir", str(self.args.output_dir)]
