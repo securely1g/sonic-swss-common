@@ -49,7 +49,7 @@ jobs:
     container:
       image: debian:trixie-20260918
       options: --init
-    timeout-minutes: 60
+    timeout-minutes: 90
     permissions:
       actions: read
       contents: read
@@ -60,7 +60,7 @@ jobs:
       run: |
         apt-get update
         apt-get install -y --no-install-recommends \
-          binutils build-essential ca-certificates git python3 tar
+          binutils build-essential ca-certificates gdb git python3 tar
 
     - name: Checkout repository
       uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744 # v3
@@ -86,6 +86,7 @@ jobs:
         git rev-parse HEAD > artifacts/codeql-go-inputs/tested-revision.txt
 
     - name: Initialize CodeQL
+      id: init
       uses: github/codeql-action/init@ec3cf9c605b848da5f1e41e8452719eb1ccfb9a6 # v2.1.29
       with:
         config-file: ./.github/codeql/codeql-config.yml
@@ -93,52 +94,92 @@ jobs:
         # Match the CLI used by the legacy job, which supports GCC 14.2.
         tools: https://github.com/github/codeql-action/releases/download/codeql-bundle-v2.27.0/codeql-bundle-linux64.tar.gz
 
-    - name: Build C++ with Bazel
-      shell: bash
+    - name: Check build reuse and coverage guards
       run: |
-        codeql_bazel_output_base="$(mktemp -d "$RUNNER_TEMP/codeql-bazel-output.XXXXXX")"
-        echo "$codeql_bazel_output_base" > artifacts/codeql-go-inputs/build-output-base.txt
-        trap 'bazel --output_base="$codeql_bazel_output_base" shutdown' EXIT
-        bazel --output_base="$codeql_bazel_output_base" build \
-          --lockfile_mode=update \
-          --//tools/bazel:yang_modules=True \
-          --spawn_strategy=local \
-          --nouse_action_cache \
-          --noremote_accept_cached \
-          --noremote_upload_local_results \
-          --disk_cache= \
-          --remote_cache= \
-          --remote_executor= \
-          --cxxopt=-nostdinc \
-          //:libswsscommon \
-          //:swssloglevel \
-          //sonic-db-cli:sonic-db-cli \
-          //pyext:_swsscommon \
-          //tests:codeql_test_sources \
-          //tests:shared_library_runtime_test
-        test ! -e Cargo.Bazel.lock
-        git diff --exit-code HEAD -- Cargo.lock
+        python3 -m unittest discover -s .github/scripts -p 'test_*.py'
+        python3 -m unittest discover -s .github/codeql/coverage -p 'test_*.py'
 
-    - name: Upload Rust dependency evidence
-      if: always()
-      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-      with:
-        name: sonic-swss-common-codeql-rust-dependencies
-        path: |
-          Cargo.lock
-          MODULE.bazel.lock
-        if-no-files-found: error
-
-    - name: Record resolved Go inputs
-      if: always()
-      run: >-
-        python3 tools/bazel/go_validation.py collect artifacts/codeql-go-inputs
-        --output-base-file artifacts/codeql-go-inputs/build-output-base.txt
+    - name: Build YANG under CodeQL and reuse outputs for tests and packages
+      run: python3 .github/scripts/codeql_build_once.py yang
 
     - name: Perform CodeQL Analysis
+      id: analyze
       uses: github/codeql-action/analyze@ec3cf9c605b848da5f1e41e8452719eb1ccfb9a6 # v2.1.29
       with:
         category: "/language:cpp"
+
+    - name: Restore the environment before running further build steps
+      env:
+        CODEQL_DATABASES: ${{ steps.analyze.outputs.db-locations }}
+      run: |
+        python3 - <<'PY'
+        import json
+        import os
+        from pathlib import Path
+
+        database = Path(json.loads(os.environ["CODEQL_DATABASES"])["cpp"])
+        tracing = database.parent / "temp/tracingEnvironment"
+        start = json.loads((tracing / "start-tracing.json").read_text())
+        end = json.loads((tracing / "end-tracing.json").read_text())
+        # The pinned action clears its own process environment. Clear persisted
+        # job variables too, including keys omitted from end-tracing.json.
+        with open(os.environ["GITHUB_ENV"], "a") as stream:
+            for key in sorted(start.keys() | end.keys()):
+                value = end.get(key) or ""
+                if any(c in key + value for c in "\r\n"):
+                    raise ValueError("Unexpected multiline tracing environment")
+                stream.write(f"{key}={value}\n")
+        PY
+
+    - name: Verify C++ source extraction
+      shell: bash
+      env:
+        CODEQL: ${{ steps.init.outputs.codeql-path }}
+        CODEQL_DATABASES: ${{ steps.analyze.outputs.db-locations }}
+      run: |
+        codeql_database="$(python3 -c 'import json, os; print(json.loads(os.environ["CODEQL_DATABASES"])["cpp"])')"
+        "$CODEQL" pack install .github/codeql/coverage
+        "$CODEQL" query run \
+          --database="$codeql_database" \
+          --output="$RUNNER_TEMP/common-cpp-files.bqrs" \
+          .github/codeql/coverage/CppSourceFiles.ql
+        "$CODEQL" bqrs decode \
+          --format=csv \
+          --output=artifacts/codeql/cpp-source-files.csv \
+          "$RUNNER_TEMP/common-cpp-files.bqrs"
+        python3 .github/codeql/coverage/check.py \
+          --csv artifacts/codeql/cpp-source-files.csv \
+          --output artifacts/codeql/source-coverage.json
+        "$CODEQL" database bundle "$codeql_database" \
+          --output=artifacts/codeql/cpp-database.zip
+
+    # Preserve the original YANG analysis scope and generated-source contents.
+    # After environment restoration, restart Bazel before switching features.
+    - name: Build and test no-YANG using the same private outputs
+      run: python3 .github/scripts/codeql_build_once.py no-yang
+
+
+    - name: Upload YANG package artifacts
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      with:
+        name: sonic-swss-common-yang-AMD64
+        path: artifacts/yang/
+        if-no-files-found: error
+
+    - name: Upload no-YANG package artifacts
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      with:
+        name: sonic-swss-common-no-yang-AMD64
+        path: artifacts/no-yang/
+        if-no-files-found: error
+
+    - name: Upload build reuse and extraction evidence
+      if: always()
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      with:
+        name: sonic-swss-common-codeql-cpp
+        path: artifacts/codeql/
+        if-no-files-found: error
 
     - name: Upload resolved build inputs
       if: always()
@@ -147,3 +188,17 @@ jobs:
         name: sonic-swss-common-codeql-go-inputs
         path: artifacts/codeql-go-inputs/
         if-no-files-found: error
+
+  # Preserve the existing required check while doing the AMD64 work once.
+  # A failed, cancelled or skipped combined job must fail this gate.
+  build-amd64:
+    name: Bazel (AMD64)
+    needs: analyze-cpp
+    if: always()
+    runs-on: ubuntu-24.04
+    permissions: {}
+    steps:
+      - name: Require the combined build, tests, packages and analysis to pass
+        env:
+          RESULT: ${{ needs.analyze-cpp.result }}
+        run: test "$RESULT" = success

@@ -69,3 +69,4 @@ sonic-db-cli/sonic-db-cli
 /MODULE.bazel.lock
 /Cargo.Bazel.lock
 /artifacts/
+__pycache__/
