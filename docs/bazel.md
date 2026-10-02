@@ -331,6 +331,11 @@ endpoints and database configuration, matching Trixie native libraries, and a
 loader configuration that can find them. Run that test separately in an
 environment providing those dependencies and services.
 
+## Cache benchmark
+
+For an optional comparison of ordinary build/test times with BuildBuddy, see
+the [cache pilot](cache-benchmark.md). Regular CI retains its GitHub caches.
+
 ## CodeQL C++ build
 
 The C++ CodeQL job builds with Bazel inside a native AMD64 Debian Trixie
