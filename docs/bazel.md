@@ -1,5 +1,10 @@
 # Standalone Bazel build
 
+The shared [`.bazelrc`](../.bazelrc) uses the maintained SONiC registry `main`
+branch followed by Bazel Central Registry, including CI and the commands below.
+Module versions, source checksums, package locks and toolchain inputs remain
+pinned. CI retains its generated module lock as resolution evidence.
+
 The standalone build uses Bazel 8.5.1, selected by `.bazelversion`. Install
 [Bazelisk](https://bazel.build/install/bazelisk) and invoke it as `bazel`.
 Dependencies come from the configured SONiC Bazel registry and the Bazel Central
