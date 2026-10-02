@@ -40,6 +40,7 @@ DIST_LOOSE_SRCS = [
     "//common:database_config.json",
 ]
 
+# sonic_deploy_tar selects tar.bzl's default_mtime for missing entry timestamps.
 DIST_LOOSE_COMMON_MTREE = [
     "var/run/redis/sonic-db/database_config.json type=file content=$(location //common:database_config.json)",
 ]
@@ -54,8 +55,8 @@ DIST_LOOSE_COMMON_MTREE = [
         },
         force_debug_build = True,
         mtree = [
-            "usr/lib/{}/libswsscommon.so.0 type=link link=libswsscommon.so.0.0.0".format(multiarch),
-            "usr/lib/{}/libswsscommon.so type=link link=libswsscommon.so.0".format(multiarch),
+            "usr/lib/{}/libswsscommon.so.0 type=link time=0 link=libswsscommon.so.0.0.0".format(multiarch),
+            "usr/lib/{}/libswsscommon.so type=link time=0 link=libswsscommon.so.0".format(multiarch),
         ] + DIST_LOOSE_COMMON_MTREE,
         target_compatible_with = ["@platforms//cpu:" + cpu],
         visibility = ["//visibility:public"],
@@ -119,8 +120,22 @@ tar(
     srcs = [
         "//sonic-db-cli",
     ],
+    default_mtime = "1672560000",
     mtree = [
         "usr/bin/sonic-db-cli type=file mode=0755 content=$(location //sonic-db-cli:sonic-db-cli)",
     ],
     visibility = ["//visibility:public"],
+)
+
+sh_test(
+    name = "package_timestamps_test",
+    srcs = ["package_timestamps_test.sh"],
+    args = [
+        "$(location :libswsscommon_pkg)",
+        "$(location :sonic-db-cli_pkg)",
+    ],
+    data = [
+        ":libswsscommon_pkg",
+        ":sonic-db-cli_pkg",
+    ],
 )
