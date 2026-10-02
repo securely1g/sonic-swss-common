@@ -72,6 +72,7 @@ jobs:
           //tests:shared_library_runtime_test
           //tests:defaultvalueprovider_ut
           //dist:libswsscommon_package_test
+          //dist:package_timestamps_test
           //pyext:swsscommon_package_test
 
       - name: Collect YANG package artifacts
@@ -108,6 +109,7 @@ jobs:
           //tests:vrf_ut
           //tests:shared_library_runtime_test
           //dist:libswsscommon_package_test
+          //dist:package_timestamps_test
           //pyext:swsscommon_package_test
 
       - name: Collect no-YANG package artifacts

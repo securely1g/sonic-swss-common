@@ -40,8 +40,10 @@ DIST_LOOSE_SRCS = [
     "//common:database_config.json",
 ]
 
+# Explicit mtree entries must set time themselves; otherwise tar copies the
+# input's timestamp, which differs between cached outputs and fresh builds.
 DIST_LOOSE_COMMON_MTREE = [
-    "var/run/redis/sonic-db/database_config.json type=file content=$(location //common:database_config.json)",
+    "var/run/redis/sonic-db/database_config.json type=file time=1672560000 content=$(location //common:database_config.json)",
 ]
 
 [
@@ -49,13 +51,13 @@ DIST_LOOSE_COMMON_MTREE = [
         name = "dist_loose_" + cpu,
         srcs = DIST_LOOSE_SRCS,
         binaries = {
-            "usr/lib/{}/libswsscommon.so.0.0.0 type=file mode=0555".format(multiarch): "//:libswsscommon_consolidated.so",
-            "usr/bin/swssloglevel type=file mode=0755": "//:swssloglevel",
+            "usr/lib/{}/libswsscommon.so.0.0.0 type=file mode=0555 time=1672560000".format(multiarch): "//:libswsscommon_consolidated.so",
+            "usr/bin/swssloglevel type=file mode=0755 time=1672560000": "//:swssloglevel",
         },
         force_debug_build = True,
         mtree = [
-            "usr/lib/{}/libswsscommon.so.0 type=link link=libswsscommon.so.0.0.0".format(multiarch),
-            "usr/lib/{}/libswsscommon.so type=link link=libswsscommon.so.0".format(multiarch),
+            "usr/lib/{}/libswsscommon.so.0 type=link time=0 link=libswsscommon.so.0.0.0".format(multiarch),
+            "usr/lib/{}/libswsscommon.so type=link time=0 link=libswsscommon.so.0".format(multiarch),
         ] + DIST_LOOSE_COMMON_MTREE,
         target_compatible_with = ["@platforms//cpu:" + cpu],
         visibility = ["//visibility:public"],
@@ -120,7 +122,20 @@ tar(
         "//sonic-db-cli",
     ],
     mtree = [
-        "usr/bin/sonic-db-cli type=file mode=0755 content=$(location //sonic-db-cli:sonic-db-cli)",
+        "usr/bin/sonic-db-cli type=file mode=0755 time=1672560000 content=$(location //sonic-db-cli:sonic-db-cli)",
     ],
     visibility = ["//visibility:public"],
+)
+
+sh_test(
+    name = "package_timestamps_test",
+    srcs = ["package_timestamps_test.sh"],
+    args = [
+        "$(location :libswsscommon_pkg)",
+        "$(location :sonic-db-cli_pkg)",
+    ],
+    data = [
+        ":libswsscommon_pkg",
+        ":sonic-db-cli_pkg",
+    ],
 )
