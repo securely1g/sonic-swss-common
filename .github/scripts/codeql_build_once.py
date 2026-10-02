@@ -11,6 +11,8 @@ import subprocess
 import tempfile
 import time
 
+from collect_bazel_resolution import collect_resolution
+
 
 # Keep the original CodeQL targets, including compile-only legacy tests.
 ANALYSIS_TARGETS = [
@@ -183,6 +185,8 @@ def main():
                 shutil.copyfile(source, destination)
                 result["packages"][destination.name] = hashlib.sha256(
                     destination.read_bytes()).hexdigest()
+            result["resolution"] = collect_resolution(
+                package_dir / "resolution", mode, "AMD64", bazel)
             receipt["configurations"][mode] = result
             (evidence / "build-once.json").write_text(json.dumps(receipt, indent=2) + "\n")
         shutil.copyfile("MODULE.bazel.lock", evidence / "MODULE.bazel.lock")

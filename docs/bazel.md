@@ -416,3 +416,10 @@ API and verifies build IDs, debug-link checksums and GDB source lookup.
 
 The installed archive uses ordinary Python imports; it does not contain the
 Bazel runfiles loader. Bazel Python consumers still use `//pyext:swsscommon`.
+
+Each native CI configuration retains its generated `MODULE.bazel.lock`, resolved
+module graph, root module declaration and registry configuration with the package
+artifacts under `resolution/`. The receipt records the source revision, YANG
+mode, runner/userspace architecture, selected target platform and SHA-256 hashes.
+The build's lock is saved before graph collection; `module-graph.lock` records
+any additional graph resolution. These are generated evidence, not tracked inputs.

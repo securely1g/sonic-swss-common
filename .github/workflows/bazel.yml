@@ -145,6 +145,8 @@ jobs:
             bazel-bin/pyext/swsscommon_pkg.tar.gz \
             bazel-bin/pyext/swsscommon_pkg.debug_symbols.tar \
             artifacts/yang/
+          python3 .github/scripts/collect_bazel_resolution.py \
+            --output artifacts/yang/resolution --mode yang --architecture ARM64
 
       - name: Record disk usage before no-YANG build
         continue-on-error: true
@@ -216,6 +218,8 @@ jobs:
             bazel-bin/pyext/swsscommon_pkg.tar.gz \
             bazel-bin/pyext/swsscommon_pkg.debug_symbols.tar \
             artifacts/no-yang/
+          python3 .github/scripts/collect_bazel_resolution.py \
+            --output artifacts/no-yang/resolution --mode no-yang --architecture ARM64
 
       - name: Upload YANG package artifacts
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
