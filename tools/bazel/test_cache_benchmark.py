@@ -10,20 +10,20 @@ import os
 from pathlib import Path
 import sys
 import tempfile
-import unittest
-from unittest import mock
+from unittest import TestCase, main, mock
 
 
 spec = importlib.util.spec_from_file_location(
     "cache_benchmark", Path(__file__).with_name("cache_benchmark.py"))
 benchmark = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(benchmark)
-SECRET = 'fixture-"secret\\DO-NOT-PUBLISH'
-FAKE = r'''
+FIXTURE_MARKER = 'fixture-"secret\\DO-NOT-PUBLISH'
+# A public marker shared with the fake process; no real credential enters the fixture.
+FAKE = 'FIXTURE_MARKER = ' + repr(FIXTURE_MARKER) + '\n' + r'''
 import gzip, json, os, pathlib, shlex, stat, sys
 root = pathlib.Path.cwd()
 scenario = json.loads((root / "scenario.json").read_text())
-secret = scenario["secret"]
+secret = FIXTURE_MARKER
 credential_values = scenario.get("credential_values", [])
 diagnostic = " | ".join(credential_values) if credential_values else secret
 args = sys.argv[1:]
@@ -82,7 +82,7 @@ sys.exit(9 if scenario.get("fail") == stem else 0)
 '''
 
 
-class BenchmarkTests(unittest.TestCase):
+class BenchmarkTests(TestCase):
     def setUp(self):
         temporary = tempfile.TemporaryDirectory()
         self.addCleanup(temporary.cleanup)
@@ -100,12 +100,12 @@ class BenchmarkTests(unittest.TestCase):
 
     def run_fixture(self, fail=None, zero_hits=False, credentials=None):
         credentials = credentials or {}
-        (self.root / "scenario.json").write_text(json.dumps({"secret": SECRET, "fail": fail,
+        (self.root / "scenario.json").write_text(json.dumps({"fail": fail,
             "zero_hits": zero_hits, "credential_names": list(credentials),
             "credential_values": list(credentials.values())}))
         environment = {"PATH": os.defpath, "BENCHMARK_FIXTURE_VISIBLE": "ordinary-value", **credentials}
         if self.args.mode == "compare":
-            environment["BUILDBUDDY_API_KEY"] = SECRET
+            environment["BUILDBUDDY_API_KEY"] = FIXTURE_MARKER
         original_execute = benchmark.execute
         def execute(command, *args):
             result = original_execute(command, *args)
@@ -116,8 +116,8 @@ class BenchmarkTests(unittest.TestCase):
              mock.patch.object(benchmark.subprocess, "check_output", return_value="revision\n"), \
              mock.patch.object(benchmark, "execute", side_effect=execute), \
              mock.patch.dict(os.environ, environment, clear=True), redirect_stdout(captured):
-            code = benchmark.run(self.args, SECRET if self.args.mode == "compare" else "")
-        self.assertNotIn(SECRET, captured.getvalue())
+            code = benchmark.run(self.args, FIXTURE_MARKER if self.args.mode == "compare" else "")
+        self.assertNotIn(FIXTURE_MARKER, captured.getvalue())
         for value in credentials.values():
             self.assertNotIn(value, captured.getvalue())
         summary = json.loads((self.args.output_dir / "summary.json").read_text())
@@ -127,8 +127,8 @@ class BenchmarkTests(unittest.TestCase):
 
     def assert_private_evidence(self, calls):
         for path in self.args.output_dir.iterdir():
-            self.assertNotIn(SECRET.encode(), path.read_bytes(), str(path))
-            self.assertNotIn(json.dumps(SECRET)[1:-1].encode(), path.read_bytes(), str(path))
+            self.assertNotIn(FIXTURE_MARKER.encode(), path.read_bytes(), str(path))
+            self.assertNotIn(json.dumps(FIXTURE_MARKER)[1:-1].encode(), path.read_bytes(), str(path))
         for call in calls:
             self.assertFalse(call["secret_in_argv"] or call["secret_in_env"] or call["key_env_present"])
             self.assertFalse(Path(call["base"]).exists())
@@ -263,4 +263,4 @@ class BenchmarkTests(unittest.TestCase):
 
 
 if __name__ == "__main__":
-    unittest.main()
+    main()
