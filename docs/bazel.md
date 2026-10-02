@@ -191,8 +191,9 @@ dependency; it is not distributed as a precompiled Rust package.
 
 ## Build artifacts
 
-Each successful Bazel job uploads its package archives. Open the repository's
-**Actions** tab, select a successful **Bazel** workflow run, and download the
+Each successful native build uploads its package archives. Open the repository's
+**Actions** tab, select a successful **CodeQL** workflow run for AMD64 or
+**Bazel** workflow run for ARM64, and download the
 artifact for your architecture and feature mode from the **Artifacts** section:
 
 - `sonic-swss-common-yang-AMD64`
@@ -334,10 +335,13 @@ environment providing those dependencies and services.
 ## CodeQL C++ build
 
 The C++ CodeQL job builds with Bazel inside a native AMD64 Debian Trixie
-container. CodeQL records compilation and linkage by observing build processes,
-so this job creates a fresh Bazel output base after CodeQL initialization, uses
-local execution, and disables action caches. Bazelisk and repository download
-caches remain available for tools and dependencies. See
+container. It also runs AMD64 tests and produces the packages listed above;
+the separate Bazel workflow validates ARM64. Manual dispatch follows the same
+division. CodeQL records compilation and linkage by observing build processes,
+so this job creates a fresh Bazel output base after CodeQL initialization and
+uses local execution. Only outputs produced inside this traced job can be reused.
+Disk/remote output caches and remote execution remain disabled. Bazelisk and
+repository download caches remain available for tools and dependencies. See
 [CodeQL and Bazel cache reuse](codeql-cache.md) for the measured cache boundary.
 
 The build passes `--cxxopt=-nostdinc` so local C++ compilation uses the
@@ -348,6 +352,23 @@ The build covers the library, command-line tools, and generated Python SWIG
 wrapper with YANG enabled. The manual `//tests:codeql_test_sources` target also
 compiles all 49 legacy C++ test files, including the YANG fixture source, without
 requiring Redis services.
+
+For YANG, the job first builds the union of required native outputs,
+packages, test executables and analysis targets under CodeQL. It then executes the tests using those outputs,
+with test-result caching disabled. Execution logs must show no build actions in
+this second phase, and every required test must execute and pass. Matching
+runtime/debug archives are copied before changing feature configuration.
+Distinct YANG, debug and linkage configurations still require distinct outputs.
+
+Analysis and its source archive are finalized before switching to no-YANG:
+generated files can share output paths across feature configurations. The
+no-YANG build and tests then run without tracing, preserving the previous
+YANG-only analysis scope and reusing common outputs from the private build.
+
+The `sonic-swss-common-codeql-cpp` artifact retains build profiles, execution
+logs, generated module resolution, package hashes and source-extraction evidence.
+The existing `Bazel (AMD64)` check requires the combined build/test/analysis job
+to succeed; a failed, cancelled or skipped job cannot satisfy it.
 
 ## SWIG constant wrapping
 
