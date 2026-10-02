@@ -21,9 +21,12 @@ def collect_resolution(output, mode, architecture, bazel_command=None):
     if platform.machine() != machine or os.environ.get("RUNNER_ARCH", architecture).upper() not in {
             architecture, "X64" if architecture == "AMD64" else "ARM64"}:
         raise RuntimeError("Resolution evidence must come from the declared native architecture")
-    if subprocess.check_output(["git", "ls-files", "MODULE.bazel.lock"], text=True).strip():
+    # Container checkout ownership can differ from the user running this step.
+    # Trust only this checkout, for these read-only Git commands.
+    git = ["git", "-c", f"safe.directory={Path.cwd().resolve()}"]
+    if subprocess.check_output(git + ["ls-files", "MODULE.bazel.lock"], text=True).strip():
         raise RuntimeError("MODULE.bazel.lock must remain generated and untracked")
-    subprocess.run(["git", "check-ignore", "-q", "MODULE.bazel.lock"], check=True)
+    subprocess.run(git + ["check-ignore", "-q", "MODULE.bazel.lock"], check=True)
     # Preserve the build's lock before asking Bazel for the resolved graph.
     build_lock = Path("MODULE.bazel.lock").read_bytes()
     json.loads(build_lock)
@@ -44,8 +47,8 @@ def collect_resolution(output, mode, architecture, bazel_command=None):
         "bazelrc.txt": Path(".bazelrc").read_bytes(),
     }
     receipt = {
-        "revision": subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip(),
-        "tree": subprocess.check_output(["git", "rev-parse", "HEAD^{tree}"], text=True).strip(),
+        "revision": subprocess.check_output(git + ["rev-parse", "HEAD"], text=True).strip(),
+        "tree": subprocess.check_output(git + ["rev-parse", "HEAD^{tree}"], text=True).strip(),
         "mode": mode,
         "runner_architecture": os.environ.get("RUNNER_ARCH", architecture),
         "userspace_machine": platform.machine(),
