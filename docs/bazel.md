@@ -233,10 +233,12 @@ environment providing those dependencies and services.
 ## CodeQL C++ build
 
 The C++ CodeQL job builds with Bazel inside a native AMD64 Debian Trixie
-container. CodeQL observes compiler processes, so this job creates a fresh Bazel
-output base after CodeQL initialization, uses local compilation, and disables
-action caches. Bazelisk and repository download caches remain available for tools
-and dependencies.
+container. CodeQL records compilation and linkage by observing build processes,
+so this job creates a fresh Bazel output base after CodeQL initialization, uses
+local execution, and disables action caches. Bazelisk and repository download
+caches remain available for tools and dependencies. See
+[CodeQL and Bazel cache reuse](codeql-cache.md) for the measured cache boundary.
+
 The build passes `--cxxopt=-nostdinc` so local C++ compilation uses the
 toolchain's explicit GCC and Debian include paths while retaining Bazel's header
 dependency checks.
