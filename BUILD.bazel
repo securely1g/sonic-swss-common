@@ -16,7 +16,6 @@ load("//tools/bazel:flags.bzl", "CXXFLAGS_COMMON")
 package(default_visibility = ["//visibility:public"])
 
 exports_files([
-    "Cargo.Bazel.lock",
     "Cargo.lock",
     "Cargo.toml",
     "LICENSE",

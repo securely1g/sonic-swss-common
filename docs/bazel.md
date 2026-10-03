@@ -4,7 +4,11 @@ The standalone build uses Bazel 8.5.1, selected by `.bazelversion`. Install
 [Bazelisk](https://bazel.build/install/bazelisk) and invoke it as `bazel`.
 Dependencies come from the configured SONiC Bazel registry and the Bazel Central
 Registry; the native GCC 14.2 toolchain and Debian package inputs are downloaded
-by Bazel.
+by Bazel. Local builds use the reviewed registry snapshot recorded in `.bazelrc`.
+CI replaces that endpoint with the maintained candidate branch
+`codex/shared-rust-deps-20261003` to validate the shared Rust registration before
+it reaches `main`. Both select one SONiC registry followed by the Bazel Central
+Registry.
 
 ## Environment
 
@@ -25,20 +29,27 @@ apt-get install -y --no-install-recommends \
 
 ## Prepare Rust dependencies
 
-Run preparation before the first Bazel command in a clean checkout. It generates
-`Cargo.Bazel.lock` from the committed `Cargo.lock` using the pinned `rules_rust`
-metadata generator and Rust toolchain. It verifies that the Cargo dependency
-versions, sources and checksums remain unchanged and writes a receipt for the
-build evidence.
+Run preparation before the first Bazel command in a clean checkout. Common and
+SWSS use one third-party Rust dependency graph from `sonic-rust-deps`. The
+preparation helper downloads the pinned module, generates its `Cargo.Bazel.lock`
+from its committed `Cargo.lock`, and selects that writable copy through an
+ignored Bazel configuration file. It checks that Common's Rust dependency
+requirements are compatible with the shared graph and leaves Common's Cargo
+manifests and lockfile unchanged.
 
 ```sh
 python3 tools/bazel/prepare_rust.py --receipt artifacts/rust-preparation.json
 # On a native ARM64 host, add --bazel-arg=--config=aarch64.
 ```
 
-Rerun preparation after changing a Cargo manifest, Cargo lock, or Bazel Rust
-configuration. Keep `Cargo.lock` in Git. The generated `Cargo.Bazel.lock` and
-`MODULE.bazel.lock` are ignored and retained as CI artifacts.
+The prepared module lives under `artifacts/rust-deps/`; the receipt records its
+exact path and source. `.bazelrc` imports
+`artifacts/rust-deps/overrides.bazelrc`, so subsequent Bazel commands use that
+same graph. There is no Common-owned `Cargo.Bazel.lock` to generate.
+
+Rerun preparation after changing the shared module version or a Rust dependency
+requirement. Keep Cargo locks in Git. Generated Bazel locks and preparation
+outputs are ignored and retained as CI artifacts.
 
 ## Build and test
 
@@ -109,7 +120,7 @@ available for reviewing those lint warnings.
 ## Rust library
 
 `//crates/swss-common:swss_common` is the public Rust library. Common owns its
-Rust sources, third-party crate dependencies, generated C API bindings, and the
+Rust sources, generated C API bindings, and the
 link to `//:libswsscommon_shared`. The default library has Cargo's `async`
 feature disabled. Its four existing unit tests run without a Redis server:
 
@@ -122,30 +133,24 @@ native AMD64 and ARM64 in both YANG modes. Redis-backed Cargo integration tests
 and the optional async feature are outside this Bazel test target.
 
 Bazel consumers depend on `@sonic-swss-common//crates/swss-common:swss_common`.
-A consumer that also resolves Common through `crate_universe` should use
-`crate.annotation(override_target_lib = ...)` to select this public target and
-disable Common's Cargo build script. This keeps Common's Rust and native code
-at the same Bazel module revision. Common's public types implement Serde
-traits, so consumers must also override their `serde` and `serde_core` crate
-targets with Common's public `:serde` and `:serde_core` aliases. Both aliases
-select version 1.0.228. This shares trait identity across the module boundary;
-matching version strings alone does not share Bazel crate targets. Consumers
-must register compatible Rust and bindgen toolchains because Common's
-standalone toolchains are development dependencies.
+Common and SWSS select third-party crates from `@sonic_rust_deps`. For example,
+Common's `CxxString` implements the Serde interfaces from
+`@sonic_rust_deps//:serde`, while SWSS's `serde_json` uses those same compiled
+interfaces. Common does not expose its own `serde` or `serde_core` aliases, and
+SWSS does not need overrides that redirect these crates through Common.
 
-`Cargo.lock` records the Cargo workspace resolution. The generated
-`Cargo.Bazel.lock` describes `crate_universe`'s Bazel dependency graph. With
-`rules_rust` 0.74.0 it must already exist before another Bazel module imports
-Common. A consumer must prepare a writable checkout of the pinned Common source
-before starting its own Bazel build, then select that prepared source with its
-module override. For SWSS and sonic-buildimage, build preparation performs this
-step before preparing their own Rust metadata. Preparing Common as a standalone
-root also makes its declared development toolchains available to the generator.
+The shared graph contains third-party crates only. Common retains its own
+library, native link dependencies, bindings, and tests. Consumers must register
+compatible Rust and bindgen toolchains because Common's standalone toolchains
+are development dependencies.
 
-After an intentional Cargo dependency update, review and commit `Cargo.lock`,
-then rerun preparation. Do not commit generated Bazel lockfiles or copy them from
-a different Common revision. The preparation receipt and metadata accompany CI
-validation evidence; they do not replace the source pin and Cargo lock.
+Common's `Cargo.lock` still records the native Cargo workspace resolution.
+The shared module owns the manifest and lock used by Bazel. After an intentional
+third-party dependency change, update and validate that shared module, then
+select its new version in each consumer. Consumers that prepare the shared
+module once can import Common directly; they do not need to generate separate
+Rust metadata for Common. Keep the preparation receipt and shared Cargo and
+Bazel locks with the validation evidence.
 
 The underlying `//crates/swss-common:bindings_dir` target remains public. It
 generates `bindings.rs` from every header in `common/c-api` and places it in the
@@ -172,8 +177,9 @@ artifact for your architecture and feature mode from the **Artifacts** section:
 
 The separate `sonic-swss-common-rust-AMD64` and
 `sonic-swss-common-rust-ARM64` artifacts retain the Rust unit-test XML, logs, and Bazel
-module lockfile for each YANG mode, the source `Cargo.lock`, generated
-`Cargo.Bazel.lock`, preparation receipt, and the tested source commit and tree.
+module lockfile for each YANG mode, Common's source `Cargo.lock`, the shared
+module's Cargo manifest and locks, preparation receipt, and the tested source
+commit and tree. The CodeQL job retains the same dependency preparation evidence.
 
 Every package download contains these four archives:
 

@@ -1,4 +1,3 @@
-load("@crates//:crates.bzl", "aliases", "all_crate_deps")
 load("@rules_cc//cc:defs.bzl", "cc_library")
 load("@rules_rust//rust:defs.bzl", "rust_library", "rust_test")
 load("@rules_rust_bindgen//:defs.bzl", "rust_bindgen")
@@ -32,36 +31,26 @@ bindings_directory(
 rust_library(
     name = "swss_common",
     srcs = glob(["src/**/*.rs"]),
-    aliases = aliases(),
     compile_data = [":bindings_dir"],
     crate_name = "swss_common",
     crate_root = "src/lib.rs",
     edition = "2021",
     link_deps = ["//:libswsscommon_shared"],
-    proc_macro_deps = all_crate_deps(proc_macro = True),
+    proc_macro_deps = ["@sonic_rust_deps//:getset"],
     rustc_env = {"OUT_DIR": "$(execpath :bindings_dir)"},
     rustc_flags = ["-Cdebuginfo=2"],
     version = "0.1.0",
     visibility = ["//visibility:public"],
-    deps = all_crate_deps(normal = True),
+    deps = [
+        "@sonic_rust_deps//:lazy_static",
+        "@sonic_rust_deps//:libc",
+        "@sonic_rust_deps//:serde",
+        "@sonic_rust_deps//:tracing-subscriber",
+    ],
 )
 
 rust_test(
     name = "swss_common_test",
     crate = ":swss_common",
     experimental_use_cc_common_link = 1,
-)
-
-# Common's public types implement Serde traits. Consumers must use these
-# same crate targets rather than compile a second instance of those traits.
-alias(
-    name = "serde",
-    actual = "@crates//:serde",
-    visibility = ["//visibility:public"],
-)
-
-alias(
-    name = "serde_core",
-    actual = "@serde_core//:serde_core",
-    visibility = ["//visibility:public"],
 )

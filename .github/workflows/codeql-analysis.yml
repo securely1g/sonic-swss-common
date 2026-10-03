@@ -75,11 +75,36 @@ jobs:
         repository-cache: true
         cache-version: "8.5.1"
 
+    - name: Select the maintained registry branch for CI
+      run: |
+        python3 - <<'PYTHON'
+        from pathlib import Path
+        path = Path(".bazelrc")
+        text = path.read_text()
+        reviewed = "https://raw.githubusercontent.com/securely1g/sonic-bazel-registry/a659adc352e05845b968cb74c2161a16b0a90741"
+        assert text.count(reviewed) == 1, "Expected one reviewed SONiC registry endpoint"
+        path.write_text(text.replace(reviewed, "https://raw.githubusercontent.com/securely1g/sonic-bazel-registry/codex/shared-rust-deps-20261003"))
+        PYTHON
+
     - name: Prepare Rust dependency metadata
       run: |
+        python3 -m unittest discover -s tools/bazel -p prepare_rust_test.py
+        test ! -e artifacts/rust-deps/overrides.bazelrc
         test ! -e Cargo.Bazel.lock
         python3 tools/bazel/prepare_rust.py --receipt artifacts/rust-preparation.json
         git diff --exit-code HEAD -- Cargo.lock
+        test ! -e Cargo.Bazel.lock
+        python3 - <<'PYTHON'
+        import json
+        from pathlib import Path
+        import shutil
+        receipt = json.loads(Path("artifacts/rust-preparation.json").read_text())
+        shared = Path(receipt["shared_dependency"]["workspace"])
+        destination = Path("artifacts/shared-rust-deps")
+        destination.mkdir(parents=True, exist_ok=True)
+        for name in ("Cargo.toml", "Cargo.lock", "Cargo.Bazel.lock", "MODULE.bazel.lock"):
+            shutil.copy2(shared / name, destination / name)
+        PYTHON
 
     - name: Initialize CodeQL
       uses: github/codeql-action/init@ec3cf9c605b848da5f1e41e8452719eb1ccfb9a6 # v2.1.29
@@ -119,7 +144,7 @@ jobs:
         path: |
           artifacts/rust-preparation.json
           Cargo.lock
-          Cargo.Bazel.lock
+          artifacts/shared-rust-deps/
           MODULE.bazel.lock
         if-no-files-found: error
 

@@ -74,8 +74,10 @@ sudo apt-get install -y --no-install-recommends \
 ```
 
 From the repository root, prepare the generated Rust dependency metadata, then
-build the C++ shared library and package archives. Preparation preserves the
-committed `Cargo.lock`; `Cargo.Bazel.lock` is generated and ignored by Git.
+build the C++ shared library and package archives. Common and SWSS use the same
+third-party crates from `sonic-rust-deps`. Preparation preserves Common's
+committed `Cargo.lock` and generates the shared module's Bazel metadata under
+`artifacts/rust-deps/`, which is ignored by Git.
 
 ```sh
 python3 tools/bazel/prepare_rust.py --receipt artifacts/rust-preparation.json
