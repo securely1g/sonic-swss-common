@@ -16,7 +16,7 @@ bazel_dep(name = "googletest", version = "1.11.0", repo_name = "com_google_googl
 bazel_dep(name = "glog", version = "0.5.0", repo_name = "com_github_google_glog")
 bazel_dep(name = "rules_python", version = "1.7.0")
 bazel_dep(name = "rules_rust", version = "0.74.0")
-bazel_dep(name = "sonic-rust-deps", version = "0.0.1-c13b2a8a7b9250c3e5c0da0d5d9c35d40f084bcb", repo_name = "sonic_rust_deps")
+bazel_dep(name = "sonic-rust-deps", version = "0.0.1-7707c0f4ab0a624941924fb02e5d908d86962277", repo_name = "sonic_rust_deps")
 bazel_dep(name = "rules_rust_bindgen", version = "0.74.0")
 bazel_dep(name = "rules_go", version = "0.60.0.sonic-patched", repo_name = "io_bazel_rules_go")
 bazel_dep(name = "rules_cc", version = "0.2.8")

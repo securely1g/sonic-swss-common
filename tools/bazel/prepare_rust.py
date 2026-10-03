@@ -12,7 +12,7 @@ import urllib.request
 
 # This bootstrap pin is separate from the Bazel module version: preparation runs
 # before Bazel can resolve the module graph. Keep the source and hash together.
-PREPARATION_REVISION = "c13b2a8a7b9250c3e5c0da0d5d9c35d40f084bcb"
+PREPARATION_REVISION = "7707c0f4ab0a624941924fb02e5d908d86962277"
 PREPARATION_SHA256 = "5847dcbc6a4098a8671c6802a490160097cf22f2bc306da329c7ae1d73334777"
 PREPARATION_URL = (
     "https://raw.githubusercontent.com/securely1g/sonic-build-infra/"

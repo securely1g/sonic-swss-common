@@ -52,7 +52,7 @@ jobs:
           from pathlib import Path
           path = Path(".bazelrc")
           text = path.read_text()
-          reviewed = "https://raw.githubusercontent.com/securely1g/sonic-bazel-registry/a659adc352e05845b968cb74c2161a16b0a90741"
+          reviewed = "https://raw.githubusercontent.com/securely1g/sonic-bazel-registry/23c5dd47421393967b0a4790470131d8829cfe9d"
           assert text.count(reviewed) == 1, "Expected one reviewed SONiC registry endpoint"
           path.write_text(text.replace(reviewed, "https://raw.githubusercontent.com/securely1g/sonic-bazel-registry/codex/shared-rust-deps-20261003"))
           PYTHON
