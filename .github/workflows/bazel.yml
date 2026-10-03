@@ -35,6 +35,9 @@ jobs:
 
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
+      - name: Configure Git for the container checkout
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
       - uses: bazel-contrib/setup-bazel@c5acdfb288317d0b5c0bbd7a396a3dc868bb0f86 # 0.19.0
         with:
           bazelisk-version: 1.29.0
@@ -79,7 +82,7 @@ jobs:
 
       - name: Collect YANG package artifacts
         run: |
-          git diff --exit-code -- Cargo.lock Cargo.Bazel.lock
+          git diff --exit-code HEAD -- Cargo.lock Cargo.Bazel.lock
           mkdir -p artifacts/yang artifacts/validation/yang
           cp bazel-testlogs/crates/swss-common/swss_common_test/test.xml bazel-testlogs/crates/swss-common/swss_common_test/test.log artifacts/validation/yang/
           cp MODULE.bazel.lock artifacts/validation/yang/
@@ -121,7 +124,7 @@ jobs:
 
       - name: Collect no-YANG package artifacts
         run: |
-          git diff --exit-code -- Cargo.lock Cargo.Bazel.lock
+          git diff --exit-code HEAD -- Cargo.lock Cargo.Bazel.lock
           mkdir -p artifacts/no-yang artifacts/validation/no-yang
           cp bazel-testlogs/crates/swss-common/swss_common_test/test.xml bazel-testlogs/crates/swss-common/swss_common_test/test.log artifacts/validation/no-yang/
           cp MODULE.bazel.lock artifacts/validation/no-yang/
