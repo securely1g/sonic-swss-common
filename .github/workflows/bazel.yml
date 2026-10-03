@@ -4,13 +4,22 @@ on:
   workflow_dispatch:
     inputs:
       cache_benchmark:
-        description: Compare BuildBuddy caching, or measure the baseline alone
+        description: Compare caches, measure the baseline, or inspect remote cache hits
         type: choice
         default: "off"
         options:
           - "off"
           - baseline
           - compare
+          - remote
+      remote_instance_amd64:
+        description: Existing AMD64 remote_instance_name from summary.json (remote mode)
+        type: string
+        default: ""
+      remote_instance_arm64:
+        description: Existing ARM64 remote_instance_name from summary.json (remote mode)
+        type: string
+        default: ""
   pull_request:
     branches: [master]
   push:
@@ -334,22 +343,33 @@ jobs:
           bazelisk-version: 1.29.0
           bazelisk-cache: true
           repository-cache: true
-          disk-cache: ${{ github.workflow }}
+          disk-cache: ${{ inputs.cache_benchmark != 'remote' && github.workflow || '' }}
           cache-version: "8.5.1"
 
       - name: Measure build and test times
         env:
-          BUILDBUDDY_API_KEY: ${{ inputs.cache_benchmark == 'compare' && secrets.BUILDBUDDY_API_KEY || '' }}
+          BUILDBUDDY_API_KEY: ${{ (inputs.cache_benchmark == 'compare' || inputs.cache_benchmark == 'remote') && secrets.BUILDBUDDY_API_KEY || '' }}
           BENCHMARK_MODE: ${{ inputs.cache_benchmark }}
           BENCHMARK_ARCH: ${{ matrix.arch }}
+          REMOTE_INSTANCE_AMD64: ${{ inputs.remote_instance_amd64 }}
+          REMOTE_INSTANCE_ARM64: ${{ inputs.remote_instance_arm64 }}
         run: |
-          mkdir -p "$HOME/.cache/bazel-disk"
+          if [ "$BENCHMARK_MODE" = remote ]; then
+            case "$BENCHMARK_ARCH" in
+              AMD64) REMOTE_INSTANCE_NAME="$REMOTE_INSTANCE_AMD64" ;;
+              ARM64) REMOTE_INSTANCE_NAME="$REMOTE_INSTANCE_ARM64" ;;
+            esac
+            set -- --remote-instance-name "$REMOTE_INSTANCE_NAME"
+          else
+            mkdir -p "$HOME/.cache/bazel-disk"
+            set -- --disk-cache "$HOME/.cache/bazel-disk"
+          fi
           python3 tools/bazel/cache_benchmark.py \
             --mode "$BENCHMARK_MODE" \
             --arch "$BENCHMARK_ARCH" \
             --output-dir artifacts/cache-benchmark \
             --repository-cache "$HOME/.cache/bazel-repo" \
-            --disk-cache "$HOME/.cache/bazel-disk"
+            "$@"
 
       - name: Upload benchmark evidence
         if: always()

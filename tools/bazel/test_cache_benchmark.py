@@ -73,6 +73,25 @@ if "test" in args:
         "\n".join(json.dumps(event) for event in events))
     pathlib.Path(option("--profile")).write_bytes(gzip.compress(
         json.dumps({"traceEvents": [], "diagnostic": diagnostic}).encode()))
+    execution_log = option("--execution_log_json_file")
+    if execution_log and scenario.get("execution_scenario") != "missing":
+        remote_hit = base.name == "remote" and not scenario.get("zero_hits")
+        records = []
+        for index, label in enumerate(("//common:shared", "@//common:shared",
+                                       "@@//tools/bazel:tool", "@@rules_cc+//cc:compiler", "")):
+            records.append({"targetLabel": label, "mnemonic": "CppCompile",
+                "runner": "remote cache hit" if remote_hit else "processwrapper-sandbox",
+                "cacheHit": remote_hit, "commandArgs": [secret, "unclassified-command-canary"],
+                "environmentVariables": [{"name": "PRIVATE", "value": "unclassified-env-canary"}],
+                "inputs": [{"path": "unclassified-input-canary"}],
+                "actualOutputs": [{"path": f"out/{index}.o" if index in (0, 3) else f"out/{index}.a"}],
+                "digest": {"hash": "abc", "sizeBytes": "3", "untrusted": secret}})
+        if scenario.get("execution_scenario") == "mismatch":
+            records.pop()
+        text = "".join(json.dumps(record, indent=2) for record in records)
+        if scenario.get("execution_scenario") == "truncated":
+            text += '{"targetLabel":"unclassified-truncated-canary'
+        pathlib.Path(execution_log).write_text(text)
     for name in ("dist/libswsscommon_pkg.tar", "dist/libswsscommon_pkg.debug_symbols.tar",
                  "dist/sonic-db-cli_pkg.tar", "pyext/swsscommon_pkg.tar.gz"):
         path = root / "bazel-bin" / name
@@ -98,18 +117,20 @@ class BenchmarkTests(TestCase):
         executable.chmod(0o700)
         self.args = argparse.Namespace(mode="compare", arch="AMD64",
             output_dir=self.root / "artifacts", repository_cache=self.root / "repos",
-            disk_cache=None,
+            disk_cache=None, remote_instance_name=None, execution_log=False,
             bazel=str(executable), remote_cache="grpcs://remote.buildbuddy.io",
             timeout_seconds=10)
 
-    def run_fixture(self, fail=None, zero_hits=False, credentials=None, cross_cache_mismatch=False):
+    def run_fixture(self, fail=None, zero_hits=False, credentials=None, cross_cache_mismatch=False,
+                    execution_scenario=None):
         credentials = credentials or {}
         (self.root / "scenario.json").write_text(json.dumps({"fail": fail,
             "zero_hits": zero_hits, "cross_cache_mismatch": cross_cache_mismatch,
+            "execution_scenario": execution_scenario,
             "credential_names": list(credentials),
             "credential_values": list(credentials.values())}))
         environment = {"PATH": os.defpath, "BENCHMARK_FIXTURE_VISIBLE": "ordinary-value", **credentials}
-        if self.args.mode == "compare":
+        if self.args.mode != "baseline":
             environment["BUILDBUDDY_API_KEY"] = FIXTURE_MARKER
         original_execute = benchmark.execute
         def execute(command, *args):
@@ -121,7 +142,7 @@ class BenchmarkTests(TestCase):
              mock.patch.object(benchmark.subprocess, "check_output", return_value="revision\n"), \
              mock.patch.object(benchmark, "execute", side_effect=execute), \
              mock.patch.dict(os.environ, environment, clear=True), redirect_stdout(captured):
-            code = benchmark.run(self.args, FIXTURE_MARKER if self.args.mode == "compare" else "")
+            code = benchmark.run(self.args, FIXTURE_MARKER if self.args.mode != "baseline" else "")
         self.assertNotIn(FIXTURE_MARKER, captured.getvalue())
         for value in credentials.values():
             self.assertNotIn(value, captured.getvalue())
@@ -290,6 +311,117 @@ class BenchmarkTests(TestCase):
                 self.assertEqual(result["complete"], expected is not None)
         path.write_text(path.read_text() + "\n{truncated")
         self.assertFalse(benchmark.bep_metrics(path)["complete"])
+
+    def test_remote_diagnostic_reuses_namespace_and_publishes_only_safe_metadata(self):
+        self.args.mode = "remote"
+        self.args.arch = "ARM64"
+        self.args.remote_instance_name = "sonic-swss-common/cache-pilot/arm64/seed"
+        code, summary, calls = self.run_fixture()
+        self.assertEqual((code, summary["status"], len(calls)), (0, "complete", 4))
+        self.assertEqual([Path(call["base"]).name for call in calls],
+                         ["preparation", "preparation", "remote", "remote"])
+        self.assertEqual([call["fresh"] for call in calls], [True, False, True, False])
+        self.assertEqual(summary["remote_instance_name"], self.args.remote_instance_name)
+        self.assertEqual(summary["purpose"], "cache_action_attribution")
+        self.assertIsNone(summary["comparison"])
+        self.assertTrue(summary["remote_reuse_observed"])
+        for call in calls[2:]:
+            for flag in ("--config=aarch64", "--disk_cache=", "--remote_accept_cached=true",
+                         "--remote_upload_local_results=false", "--remote_executor=",
+                         "--remote_download_outputs=all", "--execution_log_sort=false",
+                         "--remote_instance_name=" + self.args.remote_instance_name):
+                self.assertIn(flag, call["argv"])
+            execution_path = next(a.split("=", 1)[1] for a in call["argv"]
+                                  if a.startswith("--execution_log_json_file="))
+            self.assertNotIn(str(self.args.output_dir), execution_path)
+            self.assertFalse(Path(execution_path).exists())
+        for invocation in summary["cases"][0]["invocations"]:
+            metrics = invocation["action_attribution"]
+            self.assertTrue(metrics["complete"])
+            self.assertEqual(metrics["remote_cache_hits"], 5)
+            self.assertEqual(metrics["buckets"], {"root": 3, "dependencies": 1, "unknown": 1})
+            self.assertEqual(metrics["by_repository"]["rules_cc+"]["remote_cache_hits"], 1)
+            self.assertEqual(metrics["by_repository"]["<unknown>"]["remote_cache_hits"], 1)
+            self.assertEqual(metrics["remote_cached_object_output_count"], 2)
+            self.assertEqual(metrics["remote_cached_spawns_with_object_outputs"], 2)
+            metadata = (self.args.output_dir / invocation["artifacts"]["actions"]).read_text()
+            for omitted in ("commandArgs", "environmentVariables", "inputs", "unclassified-", "untrusted"):
+                self.assertNotIn(omitted, metadata)
+            records = [json.loads(line) for line in metadata.splitlines()]
+            self.assertEqual(len(records), 5)
+            self.assertEqual(records[0]["digest"], {"hash": "abc", "sizeBytes": "3"})
+        self.assert_private_evidence(calls)
+
+    def test_execution_log_missing_truncated_and_mismatched_counts_fail_closed(self):
+        self.args.mode = "remote"
+        self.args.remote_instance_name = "seed"
+        for scenario in ("missing", "truncated", "mismatch"):
+            with self.subTest(scenario=scenario):
+                self.args.output_dir = self.root / ("artifacts-" + scenario)
+                calls_file = self.root / "calls.jsonl"
+                calls_file.unlink(missing_ok=True)
+                code, summary, calls = self.run_fixture(execution_scenario=scenario)
+                self.assertEqual((code, summary["status"], len(calls)),
+                                 (1, "execution_log_incomplete", 3))
+                invocation = summary["cases"][0]["invocations"][0]
+                self.assertFalse(invocation["action_attribution"]["complete"])
+                self.assertNotIn("actions", invocation["artifacts"])
+                self.assertEqual(list(self.args.output_dir.glob("*.actions.jsonl")), [])
+                self.assertIsNone(summary["comparison"])
+                self.assert_private_evidence(calls)
+
+    def test_remote_diagnostic_requires_observed_hits(self):
+        self.args.mode = "remote"
+        self.args.remote_instance_name = "seed"
+        code, summary, calls = self.run_fixture(zero_hits=True)
+        self.assertEqual((code, summary["status"], len(calls)),
+                         (1, "remote_cache_not_verified", 4))
+        self.assertFalse(summary["remote_reuse_observed"])
+        self.assertIsNone(summary["comparison"])
+
+    def test_optional_execution_log_preserves_compare_mode(self):
+        self.args.execution_log = True
+        code, summary, calls = self.run_fixture()
+        self.assertEqual((code, summary["status"], len(calls)), (0, "complete", 8))
+        self.assertEqual([case["name"] for case in summary["cases"]],
+                         ["baseline", "populate", "remote"])
+        self.assertEqual(summary["comparison"]["remote_cache_hits"], 10)
+        self.assertTrue(all(invocation["action_attribution"]["complete"]
+                            for case in summary["cases"] for invocation in case["invocations"]))
+        self.assert_private_evidence(calls)
+
+    def test_execution_parser_streams_pretty_concatenated_json_and_rejects_bad_records(self):
+        records = [{"targetLabel": "//:a", "value": "brace } escaped \\\" snowman \u2603"},
+                   {"targetLabel": "@@rules_cc+//:b", "nested": {"list": [1, 2]}}]
+        text = " \n" + "".join(json.dumps(record, indent=2) for record in records) + "\n"
+        self.assertEqual(list(benchmark.execution_records(io.StringIO(text), chunk_size=7)), records)
+        for invalid in ('{"runner":', '{bad}', '{} trailing', '[]', '42'):
+            with self.subTest(invalid=invalid), self.assertRaises(ValueError):
+                list(benchmark.execution_records(io.StringIO(invalid), chunk_size=3))
+
+    def test_owner_classification_does_not_attribute_external_tools_to_root(self):
+        for label in ("//:x", "@//tools/bazel:compiler", "@@//pkg:x"):
+            self.assertEqual(benchmark.owning_repository(label), ("sonic-swss-common", "root"))
+        for label, repository in (("@@bazel_tools//tools/cpp:tool", "bazel_tools"),
+                                  ("@rules_cc+//cc:tool", "rules_cc+"),
+                                  ("@@sonic-build-infra++sysroots+sysroot//:lib", "sonic-build-infra++sysroots+sysroot")):
+            self.assertEqual(benchmark.owning_repository(label), (repository, "dependencies"))
+        for label in ("", "not-a-label", "@bad", "//without-target"):
+            self.assertEqual(benchmark.owning_repository(label), ("<unknown>", "unknown"))
+
+    def test_cli_keeps_remote_instance_inputs_out_of_other_modes(self):
+        for options in (("--mode", "remote"),
+                        ("--mode", "compare", "--remote-instance-name", "seed"),
+                        ("--mode", "baseline", "--remote-instance-name", "seed"),
+                        ("--mode", "remote", "--remote-instance-name", "seed", "--disk-cache", str(self.root))):
+            argv = ["benchmark", *options, "--arch", "AMD64", "--output-dir", str(self.args.output_dir)]
+            with self.subTest(options=options), mock.patch.object(sys, "argv", argv), \
+                 mock.patch.dict(os.environ, {"BUILDBUDDY_API_KEY": "dummy-test-key"}), \
+                 mock.patch.object(benchmark, "run") as run, redirect_stderr(io.StringIO()):
+                with self.assertRaises(SystemExit) as error:
+                    benchmark.main()
+                self.assertEqual(error.exception.code, 2)
+                run.assert_not_called()
 
 
 if __name__ == "__main__":
