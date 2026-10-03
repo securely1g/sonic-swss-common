@@ -2,6 +2,7 @@
 """Measure what BuildBuddy adds to SWSS Common's existing build cache."""
 
 import argparse
+from collections import Counter
 import gzip
 import hashlib
 import json
@@ -152,6 +153,119 @@ def bep_metrics(path):
     return metrics
 
 
+def execution_records(stream, chunk_size=1024 * 1024):
+    """Stream Bazel 8's concatenated, pretty-printed SpawnExec JSON objects."""
+    decoder = json.JSONDecoder()
+    buffer, exhausted = "", False
+    while True:
+        buffer = buffer.lstrip()
+        if buffer:
+            if not buffer.startswith("{"):
+                raise ValueError("Execution log contains a non-object record")
+            try:
+                record, end = decoder.raw_decode(buffer)
+            except ValueError:
+                if exhausted:
+                    raise ValueError("Execution log is malformed or truncated") from None
+            else:
+                yield record
+                buffer = buffer[end:]
+                continue
+        elif exhausted:
+            return
+        # Bound memory even for malformed logs. Normal records contain one spawn.
+        if len(buffer) > 64 * 1024 * 1024:
+            raise ValueError("Execution log record exceeds the 64 MiB parsing limit")
+        chunk = stream.read(chunk_size)
+        exhausted = not chunk
+        buffer += chunk
+
+
+def owning_repository(label):
+    """Attribute the action owner, never its toolchain or input repositories."""
+    if re.fullmatch(r"(?:@@?)?//[^:]*:.+", label):
+        return "sonic-swss-common", "root"
+    external = re.fullmatch(r"@@?([^/\s]+)//[^:]*:.+", label)
+    if external:
+        return external.group(1), "dependencies"
+    return "<unknown>", "unknown"
+
+
+def execution_log_metrics(source, destination, secrets, expected_remote_hits):
+    """Retain only allowlisted spawn metadata and reconcile hits with the BEP.
+
+    SpawnExec.runner and BEP runnerCount both originate in SpawnResult. Count
+    records, not unique labels: one target can own many compilation spawns.
+    Internal actions and persistent action-cache hits are absent from this log.
+    """
+    metrics = {
+        "complete": False, "spawn_count": 0, "remote_cache_hits": 0,
+        "bep_remote_cache_hits": expected_remote_hits, "runner_counts": {},
+        "buckets": {bucket: 0 for bucket in ("root", "dependencies", "unknown")},
+        "by_repository": {}, "by_mnemonic": {},
+        "remote_cached_object_output_count": 0,
+        "remote_cached_spawns_with_object_outputs": 0,
+    }
+    runners, mnemonics = Counter(), Counter()
+    try:
+        with source.open(encoding="utf-8") as stream, destination.open("wb") as retained:
+            for record in execution_records(stream):
+                label = record.get("targetLabel", "")
+                mnemonic = record.get("mnemonic", "")
+                runner = record.get("runner")
+                hit = record.get("cacheHit")
+                if (not all(isinstance(value, str) for value in (label, mnemonic, runner))
+                        or not isinstance(hit, bool)):
+                    raise ValueError("Execution log is missing valid spawn metadata")
+                if runner == "remote cache hit" and not hit:
+                    raise ValueError("Execution log remote-hit fields disagree")
+                outputs = record.get("actualOutputs", [])
+                if (not isinstance(outputs, list) or any(
+                        not isinstance(item, dict) or not isinstance(item.get("path"), str)
+                        for item in outputs)):
+                    raise ValueError("Execution log has invalid output metadata")
+                paths = [item["path"] for item in outputs]
+                # Never publish commandArgs, environmentVariables, inputs or arbitrary fields.
+                safe = {"target_label": label, "mnemonic": mnemonic, "runner": runner,
+                        "cache_hit": hit, "actual_output_paths": paths}
+                digest = record.get("digest")
+                if isinstance(digest, dict):
+                    safe["digest"] = {key: digest[key] for key in
+                                      ("hash", "sizeBytes", "hashFunctionName")
+                                      if isinstance(digest.get(key), (str, int))}
+                retained.write(sanitize(json.dumps(safe).encode() + b"\n", secrets))
+                metrics["spawn_count"] += 1
+                runners[runner] += 1
+                if runner != "remote cache hit":
+                    continue
+                repository, bucket = owning_repository(label)
+                objects = sum(path.endswith(".o") for path in paths)
+                metrics["remote_cache_hits"] += 1
+                metrics["buckets"][bucket] += 1
+                metrics["remote_cached_object_output_count"] += objects
+                metrics["remote_cached_spawns_with_object_outputs"] += int(objects > 0)
+                mnemonics[mnemonic or "<unknown>"] += 1
+                group = metrics["by_repository"].setdefault(repository, {
+                    "bucket": bucket, "remote_cache_hits": 0, "by_mnemonic": {},
+                    "remote_cached_object_output_count": 0,
+                    "remote_cached_spawns_with_object_outputs": 0,
+                })
+                group["remote_cache_hits"] += 1
+                group["remote_cached_object_output_count"] += objects
+                group["remote_cached_spawns_with_object_outputs"] += int(objects > 0)
+                name = mnemonic or "<unknown>"
+                group["by_mnemonic"][name] = group["by_mnemonic"].get(name, 0) + 1
+        metrics["runner_counts"] = dict(runners)
+        metrics["by_mnemonic"] = dict(mnemonics)
+        if expected_remote_hits is None or metrics["remote_cache_hits"] != expected_remote_hits:
+            raise ValueError("Execution-log remote cache hits do not match complete BEP evidence")
+        metrics["complete"] = True
+    except (OSError, ValueError, UnicodeError) as error:
+        metrics["error"] = sanitize(str(error).encode(), secrets).decode()
+        destination.unlink(missing_ok=True)
+    return metrics
+
+
 def package_differences(reference, candidate, check):
     differences = []
     for expected, observed in zip(reference["invocations"], candidate["invocations"]):
@@ -210,6 +324,8 @@ def cache_flags(case, endpoint, instance, disk_cache=None):
 
 
 def run(args, secret):
+    if args.mode == "remote" and not args.remote_instance_name:
+        raise ValueError("remote mode requires --remote-instance-name")
     workspace = Path(__file__).resolve().parents[2]
     output = args.output_dir.resolve()
     if output.exists() and any(output.iterdir()):
@@ -221,23 +337,28 @@ def run(args, secret):
     credentials.append(secret)
     run_id = uuid.uuid4().hex
     args.started_run_id = run_id
-    instance = f"sonic-swss-common/cache-pilot/{args.arch.lower()}/{run_id}"
+    instance = (args.remote_instance_name if args.mode == "remote" else
+                f"sonic-swss-common/cache-pilot/{args.arch.lower()}/{run_id}")
+    collect_execution = args.mode == "remote" or args.execution_log
     summary = {
         "schema_version": 1, "mode": args.mode, "arch": args.arch,
-        "run_id": run_id, "remote_instance_name": instance if args.mode == "compare" else None,
-        "remote_cache": args.remote_cache if args.mode == "compare" else None,
+        "run_id": run_id, "remote_instance_name": instance if args.mode != "baseline" else None,
+        "remote_cache": args.remote_cache if args.mode != "baseline" else None,
         "host_machine": platform.machine(),
         "git_revision": subprocess.check_output(
             ["git", "-c", f"safe.directory={workspace}", "rev-parse", "HEAD"],
             cwd=workspace, text=True).strip(),
         "bazel_version": (workspace / ".bazelversion").read_text().strip(),
         "repository_cache": str(repository_cache),
-        "baseline_cache": "restored_disk" if args.disk_cache else "cold",
+        "baseline_cache": ("disabled" if args.mode == "remote" else
+                           "restored_disk" if args.disk_cache else "cold"),
+        "execution_log_enabled": collect_execution,
+        "purpose": "cache_action_attribution" if args.mode == "remote" else "timing_comparison",
         "test_results_reused": False,
         "preparation": [], "cases": [], "comparison": None,
         "status": "running",
     }
-    if args.disk_cache:
+    if args.disk_cache and args.mode != "remote":
         snapshot = {"files": 0, "bytes": 0}
         for path in args.disk_cache.rglob("*"):
             if path.is_file():
@@ -265,6 +386,7 @@ def run(args, secret):
             stem = f"{case}-{feature}"
             raw_log, raw_bep, raw_profile = [private / (stem + suffix) for suffix in
                                               (".log", ".bep.jsonl", ".profile.json")]
+            raw_execution = private / (stem + ".execution.json")
             startup = [args.bazel, "--batch", "--nosystem_rc", "--nohome_rc",
                        f"--output_user_root={private / 'user-root'}",
                        f"--output_base={private / case}"]
@@ -282,6 +404,9 @@ def run(args, secret):
                 options += cache_flags(case, args.remote_cache, instance, disk_cache)
                 options += ["--nocache_test_results", "--test_output=errors",
                             f"--build_event_json_file={raw_bep}", f"--profile={raw_profile}"]
+                if collect_execution:
+                    options += [f"--execution_log_json_file={raw_execution}",
+                                "--execution_log_sort=false"]
             command = startup + ["fetch" if fetch else "test"] + options + targets(yang)
             print(f"{case}: {feature}", flush=True)
             result = execute(command, workspace, environment, raw_log, args.timeout_seconds)
@@ -291,6 +416,13 @@ def run(args, secret):
                     result["artifacts"][label] = source.name
             if not fetch:
                 result["cache_metrics"] = bep_metrics(output / raw_bep.name)
+                if collect_execution:
+                    metadata = output / (stem + ".actions.jsonl")
+                    result["action_attribution"] = execution_log_metrics(
+                        raw_execution, metadata, credentials,
+                        result["cache_metrics"]["remote_cache_hits"])
+                    if metadata.exists():
+                        result["artifacts"]["actions"] = metadata.name
                 result["package_sha256"] = {}
                 if result["exit_code"] == 0:
                     for name in PACKAGE_OUTPUTS:
@@ -319,7 +451,8 @@ def run(args, secret):
 
         shutil.rmtree(private / "preparation", ignore_errors=True)
 
-        cases = ["baseline"] if args.mode == "baseline" else ["baseline", "populate", "remote"]
+        cases = ([args.mode] if args.mode in ("baseline", "remote") else
+                 ["baseline", "populate", "remote"])
         if args.mode == "compare" and args.disk_cache:
             cases.append("combined")
         for case in cases:
@@ -338,9 +471,21 @@ def run(args, secret):
                     summary["status"] = "build_failed" if result["exit_code"] else "evidence_incomplete"
                     save()
                     return 1
+                if collect_execution and not result["action_attribution"]["complete"]:
+                    summary["status"] = "execution_log_incomplete"
+                    save()
+                    return 1
             # Keep only evidence after each case; sysroots otherwise exhaust CI disks.
             shutil.rmtree(private / case, ignore_errors=True)
             shutil.rmtree(private / f"{case}-disk", ignore_errors=True)
+        if args.mode == "remote":
+            hits = sum(call["cache_metrics"]["remote_cache_hits"]
+                       for call in summary["cases"][0]["invocations"])
+            summary["remote_reuse_observed"] = hits > 0
+            if not hits:
+                summary["status"] = "remote_cache_not_verified"
+                save()
+                return 1
         if args.mode == "compare":
             baseline, remote = summary["cases"][0], summary["cases"][-1]
             populate, remote_only = summary["cases"][1:3]
@@ -384,7 +529,7 @@ def run(args, secret):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--mode", choices=("baseline", "compare"), required=True)
+    parser.add_argument("--mode", choices=("baseline", "compare", "remote"), required=True)
     parser.add_argument("--arch", choices=("AMD64", "ARM64"), required=True)
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--repository-cache", type=Path,
@@ -393,11 +538,24 @@ def main():
                         help="Compare independent copies of this restored GitHub disk cache")
     parser.add_argument("--bazel", default="bazel")
     parser.add_argument("--remote-cache", default="grpcs://remote.buildbuddy.io")
+    parser.add_argument("--remote-instance-name",
+                        help="Existing seeded namespace; required only for remote mode")
+    parser.add_argument("--execution-log", action="store_true",
+                        help="Attribute cached spawns by owner; always enabled in remote mode")
     parser.add_argument("--timeout-seconds", type=int, default=3600)
     args = parser.parse_args()
-    secret = os.environ.get("BUILDBUDDY_API_KEY", "") if args.mode == "compare" else ""
-    if args.mode == "compare" and not secret:
-        parser.error("compare mode requires BUILDBUDDY_API_KEY; baseline mode needs no key")
+    secret = os.environ.get("BUILDBUDDY_API_KEY", "") if args.mode != "baseline" else ""
+    if args.mode != "baseline" and not secret:
+        parser.error("compare and remote modes require BUILDBUDDY_API_KEY; baseline needs no key")
+    if args.mode == "remote":
+        if not args.remote_instance_name:
+            parser.error("remote mode requires --remote-instance-name")
+        if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._/-]*", args.remote_instance_name):
+            parser.error("--remote-instance-name must be a nonempty cache namespace path")
+        if args.disk_cache:
+            parser.error("remote mode disables disk caching; omit --disk-cache")
+    elif args.remote_instance_name:
+        parser.error("--remote-instance-name is only accepted in remote mode")
     if secret and (not secret.isascii() or not secret.isprintable() or
                    any(character.isspace() for character in secret)):
         parser.error("BUILDBUDDY_API_KEY must contain only non-whitespace ASCII characters")

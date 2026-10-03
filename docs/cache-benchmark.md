@@ -18,8 +18,8 @@ Before using `compare`, create a key on your
 it as the repository Actions secret `BUILDBUDDY_API_KEY`. Do not commit the key.
 The comparison writes build outputs to your BuildBuddy organization; it does not
 use remote execution or upload a build-event stream to BuildBuddy. The secret is
-available only to the manually selected comparison job, not PR jobs. Missing
-credentials stop comparison before any build starts.
+available only to manually selected `compare` and `remote` jobs, not PR jobs.
+Missing credentials stop these modes before any build starts.
 
 To run on a native Trixie host with the ordinary CI prerequisites installed:
 
@@ -40,6 +40,36 @@ a GitHub cache miss. Omit it only for a deliberately cold local-cache experiment
 
 ## What the numbers mean
 
+### Inspect which repositories supply cached actions
+
+Select `cache_benchmark: remote` to inspect an existing populated BuildBuddy cache.
+Copy each architecture's `remote_instance_name` from a successful comparison's
+`summary.json` into the corresponding `remote_instance_amd64` and
+`remote_instance_arm64` workflow inputs. This mode uses remote reads only and
+skips the GitHub build-output cache. It retains the dependency download cache,
+runs the same YANG-enabled then disabled targets, and reruns tests.
+
+The runner records individual execution results and classifies each remote hit
+by its owning target label: targets in the main repository belong to
+`sonic-swss-common`; external repository targets belong to dependencies or build
+tools. Missing ownership is reported separately. The per-action count must match
+Bazel's aggregate remote-hit count. Internal actions and results reused directly
+from the output base are outside that remote-hit count.
+
+The published action records contain selected metadata only; commands,
+environments and input contents are omitted. Raw execution logs remain private
+and are deleted after processing. The breakdown counts action results rather
+than unique source files or objects stored by BuildBuddy. Extra execution logging
+has overhead, so this diagnostic is not a replacement for the original timing
+comparison. Cache eviction or changed inputs can also change its hit count.
+
+On a native host, use `--mode remote --remote-instance-name <existing-instance>`
+with the same architecture, repository cache and credentials as above. This mode
+automatically enables execution logging. Optional `--execution-log` also collects
+the breakdown during other modes.
+
+### Compare build times
+
 Each run first fetches dependencies for both YANG settings into a shared
 repository cache. Preparation is timed separately. It then runs one pass through
 these cases, in order:
@@ -48,7 +78,7 @@ these cases, in order:
 | --- | --- | --- | --- |
 | `baseline` | Private copy of restored GitHub cache | Disabled | Disabled |
 | `populate` (compare only) | Disabled | Disabled | Enabled |
-| `remote` (compare only) | Disabled | Enabled | Disabled |
+| `remote` (compare or remote-only mode) | Disabled | Enabled | Disabled |
 | `combined` (compare with `--disk-cache`) | Separate copy of the same GitHub cache | Enabled | Disabled |
 
 The comparison uses a new remote instance name for that run and architecture.
