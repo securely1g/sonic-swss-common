@@ -73,9 +73,13 @@ sudo apt-get install -y --no-install-recommends \
   binutils build-essential ca-certificates git python3 tar
 ```
 
-From the repository root, build the C++ shared library and package archives:
+From the repository root, prepare the generated Rust dependency metadata, then
+build the C++ shared library and package archives. Preparation preserves the
+committed `Cargo.lock`; `Cargo.Bazel.lock` is generated and ignored by Git.
 
 ```sh
+python3 tools/bazel/prepare_rust.py --receipt artifacts/rust-preparation.json
+
 # Native AMD64
 bazel build --//tools/bazel:yang_modules=True \
   //:libswsscommon_shared \

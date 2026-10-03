@@ -75,6 +75,12 @@ jobs:
         repository-cache: true
         cache-version: "8.5.1"
 
+    - name: Prepare Rust dependency metadata
+      run: |
+        test ! -e Cargo.Bazel.lock
+        python3 tools/bazel/prepare_rust.py --receipt artifacts/rust-preparation.json
+        git diff --exit-code HEAD -- Cargo.lock
+
     - name: Initialize CodeQL
       uses: github/codeql-action/init@ec3cf9c605b848da5f1e41e8452719eb1ccfb9a6 # v2.1.29
       with:
@@ -104,6 +110,18 @@ jobs:
           //pyext:_swsscommon \
           //tests:codeql_test_sources \
           //tests:shared_library_runtime_test
+
+    - name: Upload Rust preparation evidence
+      if: always()
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      with:
+        name: sonic-swss-common-codeql-rust-preparation
+        path: |
+          artifacts/rust-preparation.json
+          Cargo.lock
+          Cargo.Bazel.lock
+          MODULE.bazel.lock
+        if-no-files-found: error
 
     - name: Perform CodeQL Analysis
       uses: github/codeql-action/analyze@ec3cf9c605b848da5f1e41e8452719eb1ccfb9a6 # v2.1.29

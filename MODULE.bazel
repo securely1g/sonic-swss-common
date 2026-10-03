@@ -73,7 +73,8 @@ register_toolchains(
 )
 
 # Common owns the Rust library's third-party dependencies as well as its C API.
-# Ship crate_universe metadata so other Bazel modules can use the library.
+# Generate crate_universe metadata during build preparation, before another
+# Bazel module imports this source tree.
 crate = use_extension("@rules_rust//crate_universe:extensions.bzl", "crate")
 
 # Serde traits cross Common's public API. Enable the additional feature used by

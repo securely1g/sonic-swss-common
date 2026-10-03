@@ -23,6 +23,23 @@ apt-get install -y --no-install-recommends \
   binutils build-essential ca-certificates gdb git python3 tar
 ```
 
+## Prepare Rust dependencies
+
+Run preparation before the first Bazel command in a clean checkout. It generates
+`Cargo.Bazel.lock` from the committed `Cargo.lock` using the pinned `rules_rust`
+metadata generator and Rust toolchain. It verifies that the Cargo dependency
+versions, sources and checksums remain unchanged and writes a receipt for the
+build evidence.
+
+```sh
+python3 tools/bazel/prepare_rust.py --receipt artifacts/rust-preparation.json
+# On a native ARM64 host, add --bazel-arg=--config=aarch64.
+```
+
+Rerun preparation after changing a Cargo manifest, Cargo lock, or Bazel Rust
+configuration. Keep `Cargo.lock` in Git. The generated `Cargo.Bazel.lock` and
+`MODULE.bazel.lock` are ignored and retained as CI artifacts.
+
 ## Build and test
 
 Run the following from the repository root in Bash. Define the common and YANG
@@ -116,16 +133,19 @@ matching version strings alone does not share Bazel crate targets. Consumers
 must register compatible Rust and bindgen toolchains because Common's
 standalone toolchains are development dependencies.
 
-`Cargo.lock` records the Cargo workspace resolution. `Cargo.Bazel.lock` records
-`crate_universe`'s Bazel dependency graph and is required when another module
-uses Common. To refresh the Bazel graph after a deliberate dependency change:
+`Cargo.lock` records the Cargo workspace resolution. The generated
+`Cargo.Bazel.lock` describes `crate_universe`'s Bazel dependency graph. With
+`rules_rust` 0.74.0 it must already exist before another Bazel module imports
+Common. A consumer must prepare a writable checkout of the pinned Common source
+before starting its own Bazel build, then select that prepared source with its
+module override. For SWSS and sonic-buildimage, build preparation performs this
+step before preparing their own Rust metadata. Preparing Common as a standalone
+root also makes its declared development toolchains available to the generator.
 
-```sh
-CARGO_BAZEL_REPIN=1 bazel test //crates/swss-common:swss_common_test
-```
-
-Review and commit both Cargo lockfiles when their dependency resolution changes.
-`MODULE.bazel.lock` is ignored by Git and retained with the CI validation evidence.
+After an intentional Cargo dependency update, review and commit `Cargo.lock`,
+then rerun preparation. Do not commit generated Bazel lockfiles or copy them from
+a different Common revision. The preparation receipt and metadata accompany CI
+validation evidence; they do not replace the source pin and Cargo lock.
 
 The underlying `//crates/swss-common:bindings_dir` target remains public. It
 generates `bindings.rs` from every header in `common/c-api` and places it in the
@@ -152,8 +172,8 @@ artifact for your architecture and feature mode from the **Artifacts** section:
 
 The separate `sonic-swss-common-rust-AMD64` and
 `sonic-swss-common-rust-ARM64` artifacts retain the Rust unit-test XML, logs, and Bazel
-module lockfile for each YANG mode, both Cargo lockfiles, and the tested source
-commit and tree.
+module lockfile for each YANG mode, the source `Cargo.lock`, generated
+`Cargo.Bazel.lock`, preparation receipt, and the tested source commit and tree.
 
 Every package download contains these four archives:
 
