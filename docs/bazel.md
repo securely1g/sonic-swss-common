@@ -38,6 +38,8 @@ targets=(
   //:libswsscommon_consolidated.so
   //:swssloglevel
   //crates/swss-common:bindings_dir
+  //crates/swss-common:swss_common
+  //crates/swss-common:swss_common_test
   //dist:libswsscommon_pkg
   //dist:libswsscommon_pkg.debug_symbols
   //dist:sonic-db-cli_pkg
@@ -87,27 +89,55 @@ The formatting target leaves lint disabled while the build retains intentional
 Bazel 6 compatibility code. The existing `buildifier.check` target remains
 available for reviewing those lint warnings.
 
-## Rust C API bindings
+## Rust library
 
-`//crates/swss-common:bindings_dir` generates `bindings.rs` from every header in
-`common/c-api` and places it in the directory layout expected by Cargo's
-`OUT_DIR`. The header inventory comes from the same Bazel filegroup used by the
-native Common library, so adding a C API header also updates the binding input.
-The target uses `--with-derive-partialeq`, matching `build.rs`.
+`//crates/swss-common:swss_common` is the public Rust library. Common owns its
+Rust sources, third-party crate dependencies, generated C API bindings, and the
+link to `//:libswsscommon_shared`. The default library has Cargo's `async`
+feature disabled. Its four existing unit tests run without a Redis server:
 
-A `crate_universe` consumer can disable Common's build script, provide this
-directory as `compile_data` and `OUT_DIR`, and depend on
-`//:libswsscommon_shared`. The Rust crate source and the native Common module
-must select the same source revision. The consuming root must register Rust and
-`rules_rust_bindgen` toolchains; Common's standalone toolchains are development
-dependencies and do not override a consumer's choices.
+```sh
+bazel test //crates/swss-common:swss_common_test
+```
 
-Standalone CI generates bindings on native AMD64 and ARM64 in both YANG modes.
-It selects Rust 1.90.0, LLVM 17.0.6, and the bindgen 0.71.1 executable supplied
-by `rules_rust_bindgen` 0.74.0. Cargo's unchanged `build.rs` uses bindgen 0.70.1.
-The Bazel path is validated through downstream Rust compilation; it does not
-claim byte-for-byte equality with Cargo's generated file. This target generates
-bindings only and does not package or publish the Rust crate.
+Add `--config=aarch64` on native ARM64. CI runs the library and unit tests on
+native AMD64 and ARM64 in both YANG modes. Redis-backed Cargo integration tests
+and the optional async feature are outside this Bazel test target.
+
+Bazel consumers depend on `@sonic-swss-common//crates/swss-common:swss_common`.
+A consumer that also resolves Common through `crate_universe` should use
+`crate.annotation(override_target_lib = ...)` to select this public target and
+disable Common's Cargo build script. This keeps Common's Rust and native code
+at the same Bazel module revision. Common's public types implement Serde
+traits, so consumers must also override their `serde` and `serde_core` crate
+targets with Common's public `:serde` and `:serde_core` aliases. Both aliases
+select version 1.0.228. This shares trait identity across the module boundary;
+matching version strings alone does not share Bazel crate targets. Consumers
+must register compatible Rust and bindgen toolchains because Common's
+standalone toolchains are development dependencies.
+
+`Cargo.lock` records the Cargo workspace resolution. `Cargo.Bazel.lock` records
+`crate_universe`'s Bazel dependency graph and is required when another module
+uses Common. To refresh the Bazel graph after a deliberate dependency change:
+
+```sh
+CARGO_BAZEL_REPIN=1 bazel test //crates/swss-common:swss_common_test
+```
+
+Review and commit both Cargo lockfiles when their dependency resolution changes.
+`MODULE.bazel.lock` is ignored by Git and retained with the CI validation evidence.
+
+The underlying `//crates/swss-common:bindings_dir` target remains public. It
+generates `bindings.rs` from every header in `common/c-api` and places it in the
+directory layout expected by `OUT_DIR`. The header inventory comes from the
+same Bazel filegroup used by the native Common library. The target uses
+`--with-derive-partialeq`, matching `build.rs`.
+
+Standalone builds select Rust 1.90.0, LLVM 17.0.6, and the bindgen 0.71.1
+executable supplied by `rules_rust_bindgen` 0.74.0. Cargo's unchanged `build.rs`
+uses bindgen 0.70.1. Tests validate compilation and behavior; they do not claim
+byte-for-byte equality with Cargo's generated bindings. The Rust library is a
+source dependency; it is not distributed as a precompiled Rust package.
 
 ## Build artifacts
 
@@ -120,7 +150,12 @@ artifact for your architecture and feature mode from the **Artifacts** section:
 - `sonic-swss-common-no-yang-AMD64`
 - `sonic-swss-common-no-yang-ARM64`
 
-Every download contains these four archives:
+The separate `sonic-swss-common-rust-AMD64` and
+`sonic-swss-common-rust-ARM64` artifacts retain the Rust unit-test XML, logs, and Bazel
+module lockfile for each YANG mode, both Cargo lockfiles, and the tested source
+commit and tree.
+
+Every package download contains these four archives:
 
 - `libswsscommon_pkg.tar`: C++ runtime library, `swssloglevel`, Lua files, and
   database configuration.

@@ -52,12 +52,15 @@ jobs:
           ${{ matrix.bazel_args }}
           --//tools/bazel:yang_modules=True
           --test_output=errors
+          --lockfile_mode=update
           //common:cfg_schema_generated
           //:libswsscommon
           //:libswsscommon_shared
           //:libswsscommon_consolidated.so
           //:swssloglevel
           //crates/swss-common:bindings_dir
+          //crates/swss-common:swss_common
+          //crates/swss-common:swss_common_test
           //dist:libswsscommon_pkg
           //dist:libswsscommon_pkg.debug_symbols
           //dist:sonic-db-cli_pkg
@@ -76,7 +79,10 @@ jobs:
 
       - name: Collect YANG package artifacts
         run: |
-          mkdir -p artifacts/yang
+          git diff --exit-code -- Cargo.lock Cargo.Bazel.lock
+          mkdir -p artifacts/yang artifacts/validation/yang
+          cp bazel-testlogs/crates/swss-common/swss_common_test/test.xml bazel-testlogs/crates/swss-common/swss_common_test/test.log artifacts/validation/yang/
+          cp MODULE.bazel.lock artifacts/validation/yang/
           cp \
             bazel-bin/dist/libswsscommon_pkg.tar \
             bazel-bin/dist/libswsscommon_pkg.debug_symbols.tar \
@@ -90,11 +96,14 @@ jobs:
           ${{ matrix.bazel_args }}
           --//tools/bazel:yang_modules=False
           --test_output=errors
+          --lockfile_mode=update
           //:libswsscommon
           //:libswsscommon_shared
           //:libswsscommon_consolidated.so
           //:swssloglevel
           //crates/swss-common:bindings_dir
+          //crates/swss-common:swss_common
+          //crates/swss-common:swss_common_test
           //dist:libswsscommon_pkg
           //dist:libswsscommon_pkg.debug_symbols
           //dist:sonic-db-cli_pkg
@@ -112,7 +121,13 @@ jobs:
 
       - name: Collect no-YANG package artifacts
         run: |
-          mkdir -p artifacts/no-yang
+          git diff --exit-code -- Cargo.lock Cargo.Bazel.lock
+          mkdir -p artifacts/no-yang artifacts/validation/no-yang
+          cp bazel-testlogs/crates/swss-common/swss_common_test/test.xml bazel-testlogs/crates/swss-common/swss_common_test/test.log artifacts/validation/no-yang/
+          cp MODULE.bazel.lock artifacts/validation/no-yang/
+          cp Cargo.lock Cargo.Bazel.lock artifacts/validation/
+          git rev-parse HEAD > artifacts/validation/source-commit.txt
+          git rev-parse HEAD^{tree} > artifacts/validation/source-tree.txt
           cp \
             bazel-bin/dist/libswsscommon_pkg.tar \
             bazel-bin/dist/libswsscommon_pkg.debug_symbols.tar \
@@ -132,4 +147,11 @@ jobs:
         with:
           name: sonic-swss-common-no-yang-${{ matrix.arch }}
           path: artifacts/no-yang/
+          if-no-files-found: error
+
+      - name: Upload Rust validation evidence
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: sonic-swss-common-rust-${{ matrix.arch }}
+          path: artifacts/validation/
           if-no-files-found: error

@@ -1,4 +1,6 @@
+load("@crates//:crates.bzl", "aliases", "all_crate_deps")
 load("@rules_cc//cc:defs.bzl", "cc_library")
+load("@rules_rust//rust:defs.bzl", "rust_library", "rust_test")
 load("@rules_rust_bindgen//:defs.bzl", "rust_bindgen")
 load("//tools/bazel/rust:bindings.bzl", "bindings_directory", "c_api_header")
 
@@ -20,10 +22,46 @@ rust_bindgen(
     merge_cc_lib_objects_into_rlib = False,
 )
 
-# crate_universe consumers use this directory as Cargo's OUT_DIR after
-# disabling build.rs. The native library must come from this same module.
+# Keep the generated bindings available to consumers that need the raw C API.
 bindings_directory(
     name = "bindings_dir",
     src = ":bindings.rs",
+    visibility = ["//visibility:public"],
+)
+
+rust_library(
+    name = "swss_common",
+    srcs = glob(["src/**/*.rs"]),
+    aliases = aliases(),
+    compile_data = [":bindings_dir"],
+    crate_name = "swss_common",
+    crate_root = "src/lib.rs",
+    edition = "2021",
+    link_deps = ["//:libswsscommon_shared"],
+    proc_macro_deps = all_crate_deps(proc_macro = True),
+    rustc_env = {"OUT_DIR": "$(execpath :bindings_dir)"},
+    rustc_flags = ["-Cdebuginfo=2"],
+    version = "0.1.0",
+    visibility = ["//visibility:public"],
+    deps = all_crate_deps(normal = True),
+)
+
+rust_test(
+    name = "swss_common_test",
+    crate = ":swss_common",
+    experimental_use_cc_common_link = 1,
+)
+
+# Common's public types implement Serde traits. Consumers must use these
+# same crate targets rather than compile a second instance of those traits.
+alias(
+    name = "serde",
+    actual = "@crates//:serde",
+    visibility = ["//visibility:public"],
+)
+
+alias(
+    name = "serde_core",
+    actual = "@serde_core//:serde_core",
     visibility = ["//visibility:public"],
 )
