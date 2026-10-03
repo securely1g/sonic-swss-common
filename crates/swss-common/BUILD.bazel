@@ -1,7 +1,8 @@
-load("@crates//:crates.bzl", "aliases", "all_crate_deps")
 load("@rules_cc//cc:defs.bzl", "cc_library")
-load("@rules_rust//rust:defs.bzl", "rust_library", "rust_test")
-load("@rules_rust_bindgen//:defs.bzl", "rust_bindgen")
+load("@rules_rs//rs:rules_rust_bindgen.bzl", "rust_bindgen")
+load("@rules_rs//rs:rust_library.bzl", "rust_library")
+load("@rules_rs//rs:rust_test.bzl", "rust_test")
+load("@swss_common_crates//:defs.bzl", "all_crate_deps")
 load("//tools/bazel/rust:bindings.bzl", "bindings_directory", "c_api_header")
 
 c_api_header(
@@ -19,7 +20,6 @@ rust_bindgen(
     bindgen_flags = ["--with-derive-partialeq"],
     cc_lib = ":c_api_bindgen_input",
     header = ":c_api_header",
-    merge_cc_lib_objects_into_rlib = False,
 )
 
 # Keep the generated bindings available to consumers that need the raw C API.
@@ -29,16 +29,16 @@ bindings_directory(
     visibility = ["//visibility:public"],
 )
 
+# rules_rs 0.0.99 aliases() includes the dev-only testing crate. Normal
+# dependencies use their standard crate names, so this target needs no aliases.
 rust_library(
     name = "swss_common",
     srcs = glob(["src/**/*.rs"]),
-    aliases = aliases(),
     compile_data = [":bindings_dir"],
     crate_name = "swss_common",
     crate_root = "src/lib.rs",
     edition = "2021",
     link_deps = ["//:libswsscommon_shared"],
-    proc_macro_deps = all_crate_deps(proc_macro = True),
     rustc_env = {"OUT_DIR": "$(execpath :bindings_dir)"},
     rustc_flags = ["-Cdebuginfo=2"],
     version = "0.1.0",
@@ -56,12 +56,20 @@ rust_test(
 # same crate targets rather than compile a second instance of those traits.
 alias(
     name = "serde",
-    actual = "@crates//:serde",
+    actual = "@swss_common_crates//:serde-1.0.228",
+    visibility = ["//visibility:public"],
+)
+
+# rules_rs names the Cargo Git dependency after the package. This alias lets a
+# consuming root map that repository to Common's source-owned Bazel target.
+alias(
+    name = "swss-common",
+    actual = ":swss_common",
     visibility = ["//visibility:public"],
 )
 
 alias(
     name = "serde_core",
-    actual = "@serde_core//:serde_core",
+    actual = "@swss_common_crates//:serde_core-1.0.228",
     visibility = ["//visibility:public"],
 )

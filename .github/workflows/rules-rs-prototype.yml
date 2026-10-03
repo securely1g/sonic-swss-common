@@ -1,0 +1,145 @@
+name: rules_rs native prototype
+
+on:
+  push:
+    branches: [codex/rules-rs-prototype-20261003]
+
+permissions:
+  contents: read
+
+jobs:
+  native-build:
+    name: rules_rs (${{ matrix.arch }})
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: AMD64
+            machine: x86_64
+            platform: x86_64_trixie
+            runner: ubuntu-24.04
+          - arch: ARM64
+            machine: aarch64
+            platform: aarch64_trixie
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    container:
+      image: debian:trixie-20260918@sha256:9cc080028c43b27d2074d63a5f9caf7166d731494965616c1a6d2827a004585c
+      options: --init
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Install host build tools
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            binutils build-essential ca-certificates git python3 tar
+
+      - name: Check out Common prototype
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+
+      - name: Check out SWSS prototype
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: securely1g/sonic-swss
+          ref: 001a2aff15bfa79234826289a49dfa122d8e27fa
+          path: downstream-swss
+
+      - name: Verify native host
+        run: |
+          mkdir -p artifacts
+          uname -m | tee artifacts/host-machine.txt
+          test "$(uname -m)" = '${{ matrix.machine }}'
+          cp /etc/os-release artifacts/os-release
+
+      - name: Verify source inputs
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git config --global --add safe.directory "$GITHUB_WORKSPACE/downstream-swss"
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test "$(git -C downstream-swss rev-parse HEAD)" = '001a2aff15bfa79234826289a49dfa122d8e27fa'
+          git rev-parse HEAD > artifacts/common-commit.txt
+          git -C downstream-swss rev-parse HEAD > artifacts/swss-commit.txt
+          test ! -e tools/bazel/prepare_rust.py
+          test ! -e downstream-swss/tools/bazel/prepare_rust.py
+          test ! -e Cargo.Bazel.lock
+          test ! -e downstream-swss/Cargo.Bazel.lock
+          sha256sum -c <<'LOCKS'
+          d717be01bb2d42d6e564ef8813de7c88cdc43dc72b61f309f3b4d1ff652cfefd  Cargo.lock
+          b7d06ca059de2cc880e6528e9529f479cfc9802c7233622b52d4882d95746a92  downstream-swss/Cargo.lock
+          LOCKS
+
+      - name: Set up Bazel
+        uses: bazel-contrib/setup-bazel@c5acdfb288317d0b5c0bbd7a396a3dc868bb0f86 # 0.19.0
+        with:
+          bazelisk-version: 1.29.0
+          bazelisk-cache: true
+          repository-cache: true
+          cache-version: "8.5.1-rules-rs-prototype"
+
+      - name: Build and test Common in both YANG modes
+        run: |
+          for yang_mode in False True; do
+            bazel test \
+              --lockfile_mode=update \
+              --platforms=@sonic_build_infra//platforms:${{ matrix.platform }} \
+              --disk_cache= --remote_cache= --remote_executor= \
+              --jobs=4 --test_output=errors \
+              --//tools/bazel:yang_modules="$yang_mode" \
+              --build_event_json_file="$GITHUB_WORKSPACE/artifacts/common-$yang_mode.bep.json" \
+              //crates/swss-common:swss_common \
+              //crates/swss-common:swss_common_test \
+              //tests:shared_library_runtime_test
+            cp bazel-testlogs/crates/swss-common/swss_common_test/test.log \
+              "$GITHUB_WORKSPACE/artifacts/common-$yang_mode-rust-test.log"
+            cp bazel-testlogs/tests/shared_library_runtime_test/test.log \
+              "$GITHUB_WORKSPACE/artifacts/common-$yang_mode-shared-library-test.log"
+            cp MODULE.bazel.lock "$GITHUB_WORKSPACE/artifacts/common-$yang_mode-MODULE.bazel.lock"
+            test ! -e Cargo.Bazel.lock
+            git diff --exit-code HEAD -- Cargo.lock
+          done
+
+      - name: Build downstream SWSS and run Common regression
+        working-directory: downstream-swss
+        run: |
+          bazel test \
+            --lockfile_mode=update --config=release \
+            --platforms=@sonic_build_infra//platforms:${{ matrix.platform }} \
+            --override_module=sonic-swss-common="$GITHUB_WORKSPACE" \
+            --disk_cache= --remote_cache= --remote_executor= \
+            --jobs=4 --test_output=errors \
+            --build_event_json_file="$GITHUB_WORKSPACE/artifacts/swss.bep.json" \
+            //dist:cpp_binaries \
+            //crates/countersyncd:countersyncd \
+            //crates/countersyncd:common_rust_test
+          version_output="$(bazel-bin/crates/countersyncd/countersyncd --version)"
+          test "$version_output" = 'countersyncd 0.1.0'
+          printf '%s\n' "$version_output" > "$GITHUB_WORKSPACE/artifacts/countersyncd-version.txt"
+          cp bazel-testlogs/crates/countersyncd/common_rust_test/test.log \
+            "$GITHUB_WORKSPACE/artifacts/swss-common-rust-test.log"
+          cp MODULE.bazel.lock "$GITHUB_WORKSPACE/artifacts/swss-MODULE.bazel.lock"
+
+      - name: Verify source locks remain unchanged
+        run: |
+          test ! -e Cargo.Bazel.lock
+          test ! -e downstream-swss/Cargo.Bazel.lock
+          git diff --exit-code HEAD -- Cargo.lock
+          git -C downstream-swss diff --exit-code HEAD -- Cargo.lock
+          sha256sum -c <<'LOCKS'
+          d717be01bb2d42d6e564ef8813de7c88cdc43dc72b61f309f3b4d1ff652cfefd  Cargo.lock
+          b7d06ca059de2cc880e6528e9529f479cfc9802c7233622b52d4882d95746a92  downstream-swss/Cargo.lock
+          LOCKS
+          cp Cargo.lock artifacts/common-Cargo.lock
+          cp downstream-swss/Cargo.lock artifacts/swss-Cargo.lock
+
+      - name: Upload validation evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: rules-rs-native-${{ matrix.arch }}
+          path: artifacts/
+          if-no-files-found: error

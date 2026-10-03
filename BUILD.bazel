@@ -16,12 +16,22 @@ load("//tools/bazel:flags.bzl", "CXXFLAGS_COMMON")
 package(default_visibility = ["//visibility:public"])
 
 exports_files([
-    "Cargo.Bazel.lock",
     "Cargo.lock",
     "Cargo.toml",
     "LICENSE",
     "gen_cfg_schema.py",
 ])
+
+# Repository overrides in downstream rules_rs users resolve these root labels.
+alias(
+    name = "serde",
+    actual = "//crates/swss-common:serde",
+)
+
+alias(
+    name = "serde_core",
+    actual = "//crates/swss-common:serde_core",
+)
 
 swss_common_hdrs = ["//common:hdrs"]
 
