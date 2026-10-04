@@ -2,11 +2,6 @@
 
 name: "CodeQL"
 
-# Temporary Draft-PR validation: registry #33 has not landed yet.
-# Remove this override and the selection step when its module version is on main.
-env:
-  SONIC_BAZEL_REGISTRY: https://raw.githubusercontent.com/securely1g/sonic-bazel-registry/codex/deterministic-tar-timestamps
-
 on:
   push:
     branches:
@@ -72,9 +67,6 @@ jobs:
 
     - name: Configure Git for the container checkout
       run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
-
-    - name: Select the temporary registry branch for this Draft PR
-      run: python3 tools/bazel/ci_registry.py "$SONIC_BAZEL_REGISTRY"
 
     - uses: bazel-contrib/setup-bazel@c5acdfb288317d0b5c0bbd7a396a3dc868bb0f86 # 0.19.0
       with:
