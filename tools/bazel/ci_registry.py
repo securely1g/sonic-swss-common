@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Select one maintained SONiC registry branch for CI instead of the local pin."""
+"""Explicitly select one temporary registry branch while a Draft PR is reviewed."""
 
 from pathlib import Path
 import re

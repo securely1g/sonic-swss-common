@@ -6,16 +6,33 @@ Dependencies come from the configured SONiC Bazel registry and the Bazel Central
 Registry; the native GCC 14.2 toolchain and Debian package inputs are downloaded
 by Bazel.
 
-This branch uses the registry-patched `tar.bzl` default timestamp option and its
-integration in `sonic-build-infra`. The local registry snapshot is pinned in
-`.bazelrc`. The patched `tar.bzl` registration has landed on registry `main`;
-the deployment integration in `sonic-build-infra` remains under review. Until
-that registration lands, Bazel and C++ CodeQL CI replace the endpoint with the reviewed
-`codex/deterministic-tar-timestamps` registry branch. They retain Bazel Central
-Registry as the separate third-party registry. Package artifacts include the
-effective configuration (`effective.bazelrc`) and generated module lock for
-dependency inspection. After the shared prerequisites land, refresh the local
-snapshot and switch CI back to the registry's canonical `main` branch.
+Local builds and normal CI use `sonic-bazel-registry/main` in `.bazelrc`, with
+Bazel Central Registry as the separate third-party registry. Module versions
+and source checksums still select the dependencies; the registry URL does not
+select their latest source code.
+
+This Draft PR needs the timestamp integration registered by
+[registry #33](https://github.com/securely1g/sonic-bazel-registry/pull/33), which is
+not yet on `main`. Its Bazel and C++ CodeQL workflows explicitly replace the
+single SONiC endpoint with `codex/deterministic-tar-timestamps` for review. To
+validate this Draft PR locally with those same pending registrations, opt in:
+
+```sh
+python3 tools/bazel/ci_registry.py \
+  https://raw.githubusercontent.com/securely1g/sonic-bazel-registry/codex/deterministic-tar-timestamps
+```
+
+This replaces the SONiC URL; it does not add a fallback registry. The default
+`main` cannot resolve the pending version yet. After registry #33 lands, remove
+the workflows' temporary override and selection step. Restore a local override:
+
+```sh
+python3 tools/bazel/ci_registry.py \
+  https://raw.githubusercontent.com/securely1g/sonic-bazel-registry/main
+```
+
+Package artifacts retain `effective.bazelrc` and the generated module lock for
+dependency inspection.
 
 ## Environment
 
