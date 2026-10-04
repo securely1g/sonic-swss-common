@@ -73,7 +73,8 @@ jobs:
           bazel test
           ${{ matrix.bazel_args }}
           --lockfile_mode=update
-          --execution_log_json_file=artifacts/validation/yang-actions.json
+          --execution_log_compact_file=artifacts/validation/yang-actions.binpb.zst
+          --build_event_json_file=artifacts/validation/yang-events.json
           --//tools/bazel:yang_modules=True
           --test_output=errors
           --verbose_failures
@@ -127,7 +128,8 @@ jobs:
           bazel test
           ${{ matrix.bazel_args }}
           --lockfile_mode=update
-          --execution_log_json_file=artifacts/validation/no-yang-actions.json
+          --execution_log_compact_file=artifacts/validation/no-yang-actions.binpb.zst
+          --build_event_json_file=artifacts/validation/no-yang-events.json
           --//tools/bazel:yang_modules=False
           --test_output=errors
           --verbose_failures
