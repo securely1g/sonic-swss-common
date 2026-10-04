@@ -3,7 +3,7 @@ name: Bazel
 on:
   workflow_dispatch:
   pull_request:
-    branches: [master, codex/rust-library]
+    branches: [master]
   push:
     branches: [master]
 
@@ -45,17 +45,6 @@ jobs:
           repository-cache: true
           disk-cache: ${{ github.workflow }}
           cache-version: "8.5.1"
-
-      - name: Select the maintained registry branch for CI
-        run: |
-          python3 - <<'PYTHON'
-          from pathlib import Path
-          path = Path(".bazelrc")
-          text = path.read_text()
-          reviewed = "https://raw.githubusercontent.com/securely1g/sonic-bazel-registry/bfdd452e7c89d082b94d01f7135614066f280c3c"
-          assert text.count(reviewed) == 1, "Expected one reviewed SONiC registry endpoint"
-          path.write_text(text.replace(reviewed, "https://raw.githubusercontent.com/securely1g/sonic-bazel-registry/main"))
-          PYTHON
 
       - name: Record Rust source inputs
         shell: bash
