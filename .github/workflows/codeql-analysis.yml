@@ -75,6 +75,11 @@ jobs:
         repository-cache: true
         cache-version: "8.5.1"
 
+    - name: Verify Rust source inputs
+      run: |
+        test ! -e Cargo.Bazel.lock
+        git ls-files --error-unmatch Cargo.lock
+
     - name: Initialize CodeQL
       uses: github/codeql-action/init@ec3cf9c605b848da5f1e41e8452719eb1ccfb9a6 # v2.1.29
       with:
@@ -104,6 +109,18 @@ jobs:
           //pyext:_swsscommon \
           //tests:codeql_test_sources \
           //tests:shared_library_runtime_test
+        test ! -e Cargo.Bazel.lock
+        git diff --exit-code HEAD -- Cargo.lock
+
+    - name: Upload Rust dependency evidence
+      if: always()
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      with:
+        name: sonic-swss-common-codeql-rust-dependencies
+        path: |
+          Cargo.lock
+          MODULE.bazel.lock
+        if-no-files-found: error
 
     - name: Perform CodeQL Analysis
       uses: github/codeql-action/analyze@ec3cf9c605b848da5f1e41e8452719eb1ccfb9a6 # v2.1.29
