@@ -73,7 +73,9 @@ sudo apt-get install -y --no-install-recommends \
   binutils build-essential ca-certificates git python3 tar
 ```
 
-From the repository root, build the C++ shared library and package archives:
+From the repository root, build the C++ shared library and package archives.
+`rules_rs` resolves Rust dependencies directly from the committed `Cargo.toml`
+and `Cargo.lock`; no separate Rust preparation command is needed.
 
 ```sh
 # Native AMD64

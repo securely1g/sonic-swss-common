@@ -3,7 +3,7 @@ name: Bazel
 on:
   workflow_dispatch:
   pull_request:
-    branches: [master]
+    branches: [master, codex/rust-library]
   push:
     branches: [master]
 
@@ -35,6 +35,9 @@ jobs:
 
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
+      - name: Configure Git for the container checkout
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
       - uses: bazel-contrib/setup-bazel@c5acdfb288317d0b5c0bbd7a396a3dc868bb0f86 # 0.19.0
         with:
           bazelisk-version: 1.29.0
@@ -42,6 +45,28 @@ jobs:
           repository-cache: true
           disk-cache: ${{ github.workflow }}
           cache-version: "8.5.1"
+
+      - name: Select the maintained registry branch for CI
+        run: |
+          python3 - <<'PYTHON'
+          from pathlib import Path
+          path = Path(".bazelrc")
+          text = path.read_text()
+          reviewed = "https://raw.githubusercontent.com/securely1g/sonic-bazel-registry/bfdd452e7c89d082b94d01f7135614066f280c3c"
+          assert text.count(reviewed) == 1, "Expected one reviewed SONiC registry endpoint"
+          path.write_text(text.replace(reviewed, "https://raw.githubusercontent.com/securely1g/sonic-bazel-registry/main"))
+          PYTHON
+
+      - name: Record Rust source inputs
+        shell: bash
+        run: |
+          test ! -e Cargo.Bazel.lock
+          test -z "$(git ls-files Cargo.Bazel.lock)"
+          git ls-files --error-unmatch Cargo.lock
+          mkdir -p artifacts/validation
+          cp Cargo.lock artifacts/validation/
+          git rev-parse HEAD > artifacts/validation/source-commit.txt
+          git rev-parse HEAD^{tree} > artifacts/validation/source-tree.txt
 
       - name: Check Bazel formatting
         run: bazel run ${{ matrix.bazel_args }} //tools/bazel/buildifier:buildifier.format.check
@@ -52,12 +77,15 @@ jobs:
           ${{ matrix.bazel_args }}
           --//tools/bazel:yang_modules=True
           --test_output=errors
+          --lockfile_mode=update
           //common:cfg_schema_generated
           //:libswsscommon
           //:libswsscommon_shared
           //:libswsscommon_consolidated.so
           //:swssloglevel
           //crates/swss-common:bindings_dir
+          //crates/swss-common:swss_common
+          //crates/swss-common:swss_common_test
           //dist:libswsscommon_pkg
           //dist:libswsscommon_pkg.debug_symbols
           //dist:sonic-db-cli_pkg
@@ -77,9 +105,13 @@ jobs:
 
       - name: Collect YANG package artifacts
         run: |
-          mkdir -p artifacts/yang
+          test ! -e Cargo.Bazel.lock
+          git diff --exit-code HEAD -- Cargo.lock
+          mkdir -p artifacts/yang artifacts/validation/yang
           cp .bazelrc artifacts/yang/effective.bazelrc
           cp MODULE.bazel.lock artifacts/yang/
+          cp bazel-testlogs/crates/swss-common/swss_common_test/test.xml bazel-testlogs/crates/swss-common/swss_common_test/test.log artifacts/validation/yang/
+          cp MODULE.bazel.lock artifacts/validation/yang/
           cp \
             bazel-bin/dist/libswsscommon_pkg.tar \
             bazel-bin/dist/libswsscommon_pkg.debug_symbols.tar \
@@ -93,11 +125,14 @@ jobs:
           ${{ matrix.bazel_args }}
           --//tools/bazel:yang_modules=False
           --test_output=errors
+          --lockfile_mode=update
           //:libswsscommon
           //:libswsscommon_shared
           //:libswsscommon_consolidated.so
           //:swssloglevel
           //crates/swss-common:bindings_dir
+          //crates/swss-common:swss_common
+          //crates/swss-common:swss_common_test
           //dist:libswsscommon_pkg
           //dist:libswsscommon_pkg.debug_symbols
           //dist:sonic-db-cli_pkg
@@ -116,9 +151,13 @@ jobs:
 
       - name: Collect no-YANG package artifacts
         run: |
-          mkdir -p artifacts/no-yang
+          test ! -e Cargo.Bazel.lock
+          git diff --exit-code HEAD -- Cargo.lock
+          mkdir -p artifacts/no-yang artifacts/validation/no-yang
           cp .bazelrc artifacts/no-yang/effective.bazelrc
           cp MODULE.bazel.lock artifacts/no-yang/
+          cp bazel-testlogs/crates/swss-common/swss_common_test/test.xml bazel-testlogs/crates/swss-common/swss_common_test/test.log artifacts/validation/no-yang/
+          cp MODULE.bazel.lock artifacts/validation/no-yang/
           cp \
             bazel-bin/dist/libswsscommon_pkg.tar \
             bazel-bin/dist/libswsscommon_pkg.debug_symbols.tar \
@@ -138,4 +177,12 @@ jobs:
         with:
           name: sonic-swss-common-no-yang-${{ matrix.arch }}
           path: artifacts/no-yang/
+          if-no-files-found: error
+
+      - name: Upload Rust validation evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: sonic-swss-common-rust-${{ matrix.arch }}
+          path: artifacts/validation/
           if-no-files-found: error
