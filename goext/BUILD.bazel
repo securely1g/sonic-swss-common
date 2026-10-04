@@ -108,3 +108,37 @@ go_test(
     embed = [":swsscommon"],
     tags = ["manual"],
 )
+
+# Exercise an actual distro header in a Go cgo action. The SWIG wrapper above
+# compiles its C++ separately and does not cover this header propagation path.
+go_library(
+    name = "hiredis_cgo",
+    testonly = True,
+    srcs = ["hiredis_cgo.go"],
+    cdeps = ["//:common_deps"],
+    cgo = True,
+    importpath = "github.com/sonic-net/sonic-swss-common/goext/hiredis",
+)
+
+go_test(
+    name = "hiredis_cgo_test_binary",
+    srcs = ["hiredis_cgo_test.go"],
+    embed = [":hiredis_cgo"],
+    tags = ["manual"],
+)
+
+sh_test(
+    name = "hiredis_cgo_test",
+    srcs = ["//tools/bazel/runtime:run_with_runtime.py"],
+    args = [
+        "$(location //tools/bazel/runtime:test_runtime)",
+        "-",
+    ] + select({
+        "//tools/bazel:yang_modules_enabled": ["enabled"],
+        "//conditions:default": ["disabled"],
+    }) + ["$(location :hiredis_cgo_test_binary)"],
+    data = [
+        ":hiredis_cgo_test_binary",
+        "//tools/bazel/runtime:test_runtime",
+    ],
+)

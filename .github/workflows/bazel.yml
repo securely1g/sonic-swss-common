@@ -43,6 +43,15 @@ jobs:
           disk-cache: ${{ github.workflow }}
           cache-version: "8.5.1"
 
+      - name: Record native build inputs
+        run: |
+          test ! -e MODULE.bazel.lock
+          mkdir -p artifacts/validation
+          uname -m > artifacts/validation/runner-architecture.txt
+          dpkg --print-architecture > artifacts/validation/userspace-architecture.txt
+          git rev-parse HEAD > artifacts/validation/tested-revision.txt
+          bazel version > artifacts/validation/bazel-version.txt
+
       - name: Check Bazel formatting
         run: bazel run ${{ matrix.bazel_args }} //tools/bazel/buildifier:buildifier.format.check
 
@@ -50,6 +59,8 @@ jobs:
         run: >-
           bazel test
           ${{ matrix.bazel_args }}
+          --lockfile_mode=update
+          --execution_log_json_file=artifacts/validation/yang-actions.json
           --//tools/bazel:yang_modules=True
           --test_output=errors
           //common:cfg_schema_generated
@@ -77,6 +88,8 @@ jobs:
       - name: Collect YANG package artifacts
         run: |
           mkdir -p artifacts/yang
+          mkdir -p artifacts/validation/yang
+          cp -L bazel-testlogs/goext/swsscommon_runtime_test/test.log bazel-testlogs/goext/swsscommon_runtime_test/test.xml artifacts/validation/yang/
           cp \
             bazel-bin/dist/libswsscommon_pkg.tar \
             bazel-bin/dist/libswsscommon_pkg.debug_symbols.tar \
@@ -88,6 +101,8 @@ jobs:
         run: >-
           bazel test
           ${{ matrix.bazel_args }}
+          --lockfile_mode=update
+          --execution_log_json_file=artifacts/validation/no-yang-actions.json
           --//tools/bazel:yang_modules=False
           --test_output=errors
           //:libswsscommon
@@ -113,6 +128,8 @@ jobs:
       - name: Collect no-YANG package artifacts
         run: |
           mkdir -p artifacts/no-yang
+          mkdir -p artifacts/validation/no-yang
+          cp -L bazel-testlogs/goext/swsscommon_runtime_test/test.log bazel-testlogs/goext/swsscommon_runtime_test/test.xml artifacts/validation/no-yang/
           cp \
             bazel-bin/dist/libswsscommon_pkg.tar \
             bazel-bin/dist/libswsscommon_pkg.debug_symbols.tar \
@@ -132,4 +149,87 @@ jobs:
         with:
           name: sonic-swss-common-no-yang-${{ matrix.arch }}
           path: artifacts/no-yang/
+          if-no-files-found: error
+
+      - name: Record resolved Go inputs
+        if: always()
+        run: |
+          mkdir -p artifacts/validation
+          bazel mod graph --lockfile_mode=update > artifacts/validation/module-graph.txt
+          bazel mod show_repo @io_bazel_rules_go > artifacts/validation/rules-go-repository.txt
+          bazel run ${{ matrix.bazel_args }} @io_bazel_rules_go//go -- version > artifacts/validation/go-version.txt
+          cp MODULE.bazel.lock artifacts/validation/
+          git diff --exit-code > artifacts/validation/tracked-files.diff
+
+      - name: Upload native validation evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: sonic-swss-common-go-validation-${{ matrix.arch }}
+          path: artifacts/validation/
+          if-no-files-found: error
+
+  cgo-headers:
+    name: Cgo headers (${{ matrix.arch }}, external includes ${{ matrix.external_includes }})
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [AMD64, ARM64]
+        external_includes: [enabled, disabled]
+        include:
+          - arch: AMD64
+            runner: ubuntu-24.04
+            bazel_args: ""
+          - arch: ARM64
+            runner: ubuntu-24.04-arm
+            bazel_args: --config=aarch64
+          - external_includes: enabled
+            feature: external_include_paths
+          - external_includes: disabled
+            feature: -external_include_paths
+    runs-on: ${{ matrix.runner }}
+    container: debian:trixie-20260918
+    steps:
+      - name: Install host build tools
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends build-essential ca-certificates git python3 tar
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: bazel-contrib/setup-bazel@c5acdfb288317d0b5c0bbd7a396a3dc868bb0f86 # 0.19.0
+        with:
+          bazelisk-version: 1.29.0
+          bazelisk-cache: true
+          repository-cache: true
+          disk-cache: ${{ github.workflow }}-cgo-headers
+          cache-version: "8.5.1"
+      - name: Test direct cgo use of the imported hiredis headers
+        run: |
+          test ! -e MODULE.bazel.lock
+          mkdir -p artifacts/validation
+          uname -m > artifacts/validation/runner-architecture.txt
+          dpkg --print-architecture > artifacts/validation/userspace-architecture.txt
+          git rev-parse HEAD > artifacts/validation/tested-revision.txt
+          bazel test ${{ matrix.bazel_args }} \
+            --lockfile_mode=update \
+            --//tools/bazel:yang_modules=False \
+            --features=${{ matrix.feature }} \
+            --execution_log_json_file=artifacts/validation/cgo-actions.json \
+            --test_output=errors \
+            //goext:hiredis_cgo_test
+      - name: Collect cgo header evidence
+        if: always()
+        run: |
+          mkdir -p artifacts/validation
+          if test -f MODULE.bazel.lock; then cp MODULE.bazel.lock artifacts/validation/; fi
+          if test -d bazel-testlogs/goext/hiredis_cgo_test; then
+            cp -L bazel-testlogs/goext/hiredis_cgo_test/test.log bazel-testlogs/goext/hiredis_cgo_test/test.xml artifacts/validation/
+          fi
+          git diff --exit-code > artifacts/validation/tracked-files.diff
+      - name: Upload cgo header evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: sonic-swss-common-cgo-headers-${{ matrix.arch }}-${{ matrix.external_includes }}
+          path: artifacts/validation/
           if-no-files-found: error
