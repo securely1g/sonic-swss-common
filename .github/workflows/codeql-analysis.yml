@@ -10,6 +10,7 @@ on:
   pull_request:
     branches:
       - 'master'
+      - 'codex/rust-library'
       - '202[0-9][0-9][0-9]'
   workflow_dispatch:
 
@@ -86,25 +87,10 @@ jobs:
         path.write_text(text.replace(reviewed, "https://raw.githubusercontent.com/securely1g/sonic-bazel-registry/main"))
         PYTHON
 
-    - name: Prepare Rust dependency metadata
+    - name: Verify Rust source inputs
       run: |
-        python3 -m unittest discover -s tools/bazel -p prepare_rust_test.py
-        test ! -e artifacts/rust-deps/overrides.bazelrc
         test ! -e Cargo.Bazel.lock
-        python3 tools/bazel/prepare_rust.py --receipt artifacts/rust-preparation.json
-        git diff --exit-code HEAD -- Cargo.lock
-        test ! -e Cargo.Bazel.lock
-        python3 - <<'PYTHON'
-        import json
-        from pathlib import Path
-        import shutil
-        receipt = json.loads(Path("artifacts/rust-preparation.json").read_text())
-        shared = Path(receipt["shared_dependency"]["workspace"])
-        destination = Path("artifacts/shared-rust-deps")
-        destination.mkdir(parents=True, exist_ok=True)
-        for name in ("Cargo.toml", "Cargo.lock", "Cargo.Bazel.lock", "MODULE.bazel.lock"):
-            shutil.copy2(shared / name, destination / name)
-        PYTHON
+        git ls-files --error-unmatch Cargo.lock
 
     - name: Initialize CodeQL
       uses: github/codeql-action/init@ec3cf9c605b848da5f1e41e8452719eb1ccfb9a6 # v2.1.29
@@ -135,16 +121,16 @@ jobs:
           //pyext:_swsscommon \
           //tests:codeql_test_sources \
           //tests:shared_library_runtime_test
+        test ! -e Cargo.Bazel.lock
+        git diff --exit-code HEAD -- Cargo.lock
 
-    - name: Upload Rust preparation evidence
+    - name: Upload Rust dependency evidence
       if: always()
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
       with:
-        name: sonic-swss-common-codeql-rust-preparation
+        name: sonic-swss-common-codeql-rust-dependencies
         path: |
-          artifacts/rust-preparation.json
           Cargo.lock
-          artifacts/shared-rust-deps/
           MODULE.bazel.lock
         if-no-files-found: error
 

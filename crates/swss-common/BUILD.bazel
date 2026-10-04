@@ -1,6 +1,8 @@
 load("@rules_cc//cc:defs.bzl", "cc_library")
-load("@rules_rust//rust:defs.bzl", "rust_library", "rust_test")
-load("@rules_rust_bindgen//:defs.bzl", "rust_bindgen")
+load("@rules_rs//rs:rules_rust_bindgen.bzl", "rust_bindgen")
+load("@rules_rs//rs:rust_library.bzl", "rust_library")
+load("@rules_rs//rs:rust_test.bzl", "rust_test")
+load("@swss_common_crates//:defs.bzl", "all_crate_deps")
 load("//tools/bazel/rust:bindings.bzl", "bindings_directory", "c_api_header")
 
 c_api_header(
@@ -18,7 +20,6 @@ rust_bindgen(
     bindgen_flags = ["--with-derive-partialeq"],
     cc_lib = ":c_api_bindgen_input",
     header = ":c_api_header",
-    merge_cc_lib_objects_into_rlib = False,
 )
 
 # Keep the generated bindings available to consumers that need the raw C API.
@@ -28,6 +29,8 @@ bindings_directory(
     visibility = ["//visibility:public"],
 )
 
+# rules_rs 0.0.99 aliases() includes the dev-only testing crate. Normal
+# dependencies use their standard crate names, so this target needs no aliases.
 rust_library(
     name = "swss_common",
     srcs = glob(["src/**/*.rs"]),
@@ -36,21 +39,37 @@ rust_library(
     crate_root = "src/lib.rs",
     edition = "2021",
     link_deps = ["//:libswsscommon_shared"],
-    proc_macro_deps = ["@sonic_rust_deps//:getset"],
     rustc_env = {"OUT_DIR": "$(execpath :bindings_dir)"},
     rustc_flags = ["-Cdebuginfo=2"],
     version = "0.1.0",
     visibility = ["//visibility:public"],
-    deps = [
-        "@sonic_rust_deps//:lazy_static",
-        "@sonic_rust_deps//:libc",
-        "@sonic_rust_deps//:serde",
-        "@sonic_rust_deps//:tracing-subscriber",
-    ],
+    deps = all_crate_deps(normal = True),
 )
 
 rust_test(
     name = "swss_common_test",
     crate = ":swss_common",
     experimental_use_cc_common_link = 1,
+)
+
+# Common's public types implement Serde traits. Consumers must use these
+# same crate targets rather than compile a second instance of those traits.
+alias(
+    name = "serde",
+    actual = "@swss_common_crates//:serde-1.0.228",
+    visibility = ["//visibility:public"],
+)
+
+# rules_rs names the Cargo Git dependency after the package. This alias lets a
+# consuming root map that repository to Common's source-owned Bazel target.
+alias(
+    name = "swss-common",
+    actual = ":swss_common",
+    visibility = ["//visibility:public"],
+)
+
+alias(
+    name = "serde_core",
+    actual = "@swss_common_crates//:serde_core-1.0.228",
+    visibility = ["//visibility:public"],
 )
