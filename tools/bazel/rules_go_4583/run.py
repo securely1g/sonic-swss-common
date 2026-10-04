@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run the original #4583 fixture against the unmodified BCR release."""
+"""Run the original #4583 fixture against the registry's repaired 0.64.1 release."""
 
 import argparse
 import difflib
@@ -24,10 +24,22 @@ PATCH_URL = (
 )
 PATCH_SHA256 = "e63b32e838307fdcc0ccff46fc134c0fecc0f404d7a96c3c85a08987d717a9b8"
 ORIGINAL_SHA256 = "38fcad078f0cc587e0c45a0338d11d50e3b8e70bba5cfdd1693ed13b00bb03c8"
-CGO_SHA256 = "361023a9ac9509963e4a761b609b105f7d95848c8052230ccbbd8a7f505c04d1"
+BASE_CGO_SHA256 = "361023a9ac9509963e4a761b609b105f7d95848c8052230ccbbd8a7f505c04d1"
+CGO_SHA256 = "5f7e9f6788a1ba8d57aa4752212d0fad390657b3cb3d40c2962886ae8fe28bd9"
+RULES_GO_VERSION = "0.64.1-sonic.1"
+PRODUCTION_REGISTRY = "https://raw.githubusercontent.com/securely1g/sonic-bazel-registry/codex/rules-go-0641-headers/"
+REVIEWED_REGISTRY_COMMIT = "c43f38d9b3b77bdffa1b4287c10587897ee214d2"
+PRODUCTION_PATCH_URL = (
+    "https://github.com/securely1g/sonic-bazel-registry/blob/"
+    + REVIEWED_REGISTRY_COMMIT + "/modules/rules_go/" + RULES_GO_VERSION
+    + "/patches/0001_resolve_relative_cgo_header_paths_pr_4583.patch"
+)
+PRODUCTION_PATCH_SHA256 = "0602a8881078f38bb8c19caece4f901a048b17cef03d379ffc9baaa83f9c07ac"
+REGISTRY_ARGS = ["--registry=" + PRODUCTION_REGISTRY, "--registry=https://bcr.bazel.build"]
 
 MODULE = '''module(name = "rules_go_4583_regression")
-bazel_dep(name = "rules_go", version = "0.64.1", repo_name = "io_bazel_rules_go")
+bazel_dep(name = "rules_go", version = "0.64.1-sonic.1", repo_name = "io_bazel_rules_go")
+single_version_override(module_name = "rules_go", version = "0.64.1-sonic.1")
 go_sdk = use_extension("@io_bazel_rules_go//go:extensions.bzl", "go_sdk")
 go_sdk.download(version = "1.25.0")
 '''
@@ -116,7 +128,7 @@ def nested_bazel(args):
         for path in sorted(tested_repo.rglob("*")) if path.is_file()
     })
     if sha256(cgo_bytes) != CGO_SHA256:
-        print("The nested rules_go cgo implementation differs from v0.64.1", file=sys.stderr)
+        print("The nested rules_go cgo implementation differs from the reviewed 0.64.1 repair", file=sys.stderr)
         return 2
 
     build_rc, output = run_command([real_bazel, *effective_args], workspace, env,
@@ -197,10 +209,19 @@ def main():
         original.decode().splitlines(keepends=True), adapted.decode().splitlines(keepends=True),
         fromfile="original_cc_header_inputs_test.go", tofile="adapted_cc_header_inputs_test.go")))
     write_json(artifacts / "source-provenance.json", {
-        "registry_commit": REGISTRY_COMMIT, "patch_url": PATCH_URL,
-        "patch_sha256": PATCH_SHA256, "original_patch_commit": "a038f38af7a82a1e395b4f1e966b597ae104ea2f",
+        "original_test_patch": {
+            "registry_commit": REGISTRY_COMMIT, "patch_url": PATCH_URL,
+            "patch_sha256": PATCH_SHA256,
+            "original_patch_commit": "a038f38af7a82a1e395b4f1e966b597ae104ea2f",
+        },
+        "production_patch": {
+            "registry": PRODUCTION_REGISTRY, "patch_url": PRODUCTION_PATCH_URL,
+            "reviewed_registry_commit": REVIEWED_REGISTRY_COMMIT,
+            "patch_sha256": PRODUCTION_PATCH_SHA256, "upstream_base_version": "0.64.1",
+            "upstream_cgo_sha256": BASE_CGO_SHA256, "patched_cgo_sha256": CGO_SHA256,
+        },
         "original_test_sha256": sha256(original), "adapted_test_sha256": sha256(adapted),
-        "rules_go_version": "0.64.1", "upstream_cgo_sha256": CGO_SHA256,
+        "rules_go_version": RULES_GO_VERSION,
         "driver_sha256": sha256(Path(__file__).read_bytes()),
         "nested_harness_rules_cc": "0.2.18", "prior_common_rules_cc": "0.2.16",
         "coverage": "Original build-only tests; no generated binary execution",
@@ -253,7 +274,7 @@ def main():
             if test_filter:
                 test_source.write_bytes(adapted)
             command = [
-                *bazel, "test", "//:cc_header_inputs_test",
+                *bazel, "test", "//:cc_header_inputs_test", *REGISTRY_ARGS,
                 "--lockfile_mode=update", "--nocache_test_results", "--test_output=all",
                 # Bazelisk prepends its executable directory to PATH. Keep our
                 # evidence wrapper first inside the nested test process.
@@ -282,8 +303,8 @@ def main():
                     shutil.copyfile(source, evidence / file_name)
 
         for name, command in {
-            "outer-rules-go-repository.txt": ["mod", "show_repo", "@io_bazel_rules_go"],
-            "outer-go-version.txt": ["run", "@io_bazel_rules_go//go", "--", "version"],
+            "outer-rules-go-repository.txt": ["mod", "show_repo", *REGISTRY_ARGS, "@io_bazel_rules_go"],
+            "outer-go-version.txt": ["run", *REGISTRY_ARGS, "@io_bazel_rules_go//go", "--", "version"],
         }.items():
             exit_code, _ = run_command([*bazel, *command], workspace, env, artifacts / name)
             summary.setdefault("metadata_exit_codes", {})[name] = exit_code

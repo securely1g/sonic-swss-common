@@ -1,4 +1,4 @@
-# Original rules_go #4583 regression
+# Original rules_go #4583 regression with the missing repair
 
 Run on native Linux AMD64 or ARM64 with Bazelisk on PATH:
 
@@ -6,9 +6,19 @@ Run on native Linux AMD64 or ARM64 with Bazelisk on PATH:
 python3 tools/bazel/rules_go_4583/run.py --artifacts /absolute/fresh/evidence-directory
 ```
 
-The driver creates a temporary, isolated module selecting BCR `rules_go 0.64.1`
-and Go `1.25.0`. It does not alter Common's module or the rules_go implementation.
-Both outer and nested invocations explicitly select Bazel `8.5.1`.
+The driver creates a temporary, isolated module selecting `rules_go 0.64.1-sonic.1`
+from the registry's `codex/rules-go-0641-headers` branch, followed by BCR. A root
+`single_version_override` keeps the prerelease selected. The registry applies only
+the missing #4583 include-path repair to upstream 0.64.1; the production patch
+stays in the registry. Common's module is unchanged. Both outer and nested
+invocations explicitly select Bazel `8.5.1` and Go `1.25.0`, matching the failing
+unmodified baseline.
+
+Evidence records the production patch URL/hash, upstream base-source hash, and
+expected patched-source hash separately from the original test patch below.
+The nested harness uses its existing local override to the selected rules_go
+files, and the driver requires their cgo implementation to match the reviewed
+patch exactly.
 
 `original_cc_header_inputs_test.go.txt` is the exact 3,476-byte test extracted
 from registry patch 0003 at commit `3fc93604f17c358630171af3094f375b6c88ed3b`
