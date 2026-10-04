@@ -48,6 +48,13 @@ def write_json(path, value):
     path.write_text(json.dumps(value, indent=2, sort_keys=True) + "\n")
 
 
+def has_pinned_bazel_version(exit_code, output):
+    # A cold Bazelisk cache emits download/signature diagnostics before stdout.
+    versions = [line.strip() for line in output.splitlines()
+                if line.strip().startswith("bazel ")]
+    return exit_code == 0 and versions == ["bazel 8.5.1"]
+
+
 def run_command(args, cwd, env, log):
     result = subprocess.run(args, cwd=cwd, env=env, stdout=subprocess.PIPE,
                             stderr=subprocess.STDOUT, check=False)
@@ -94,7 +101,7 @@ def nested_bazel(args):
     })
     version_rc, version = run_command([real_bazel, "--version"], workspace, env,
                                       evidence / "nested-bazel-version.txt")
-    if version_rc or version.strip() != "bazel 8.5.1":
+    if not has_pinned_bazel_version(version_rc, version):
         print("Nested Bazel version is not exactly 8.5.1", file=sys.stderr)
         return 2
 
@@ -230,7 +237,7 @@ def main():
         bazel = [real_bazel, "--nosystem_rc", "--nohome_rc"]
         version_rc, version = run_command([real_bazel, "--version"], workspace, env,
                                           artifacts / "outer-bazel-version.txt")
-        if version_rc or version.strip() != "bazel 8.5.1":
+        if not has_pinned_bazel_version(version_rc, version):
             raise ValueError("Outer Bazel version is not exactly 8.5.1")
         cases = [
             ("original", None),
