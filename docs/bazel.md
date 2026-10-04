@@ -4,9 +4,8 @@ The standalone build uses Bazel 8.5.1, selected by `.bazelversion`. Install
 [Bazelisk](https://bazel.build/install/bazelisk) and invoke it as `bazel`.
 Dependencies come from the configured SONiC Bazel registry and the Bazel Central
 Registry; the native GCC 14.2 toolchain and Debian package inputs are downloaded
-by Bazel. Local builds use the landed registry snapshot recorded in `.bazelrc`.
-CI replaces that endpoint with the maintained `main` branch. Both select one
-SONiC registry followed by the Bazel Central Registry.
+by Bazel. Local builds and CI use the maintained SONiC registry `main` branch,
+followed by the Bazel Central Registry.
 
 ## Environment
 
@@ -32,6 +31,12 @@ and `Cargo.lock` when Bazel evaluates the module graph. A clean checkout needs
 no preparation script or `Cargo.Bazel.lock`. Keep `Cargo.lock` in Git and update
 it with Cargo when intentionally changing dependencies. The generated
 `MODULE.bazel.lock` stays ignored and is retained with CI evidence.
+
+The Bazel 8.5.1 root selects `rules_cc` 0.2.20 with a
+`single_version_override`. Distroless uses its private C++ import rule, and
+rules_cc 0.2.21/0.2.22 require a runtime toolchain type absent from Bazel 8.5.1.
+An external root must repeat this override because module overrides do not
+propagate from dependencies.
 
 ## Build and test
 
@@ -133,7 +138,7 @@ same Bazel filegroup used by the native Common library. The target uses
 `--with-derive-partialeq`, matching `build.rs`.
 
 Standalone builds select Rust 1.90.0 and use the Rust and bindgen integration
-provided by `rules_rs` 0.0.99. Cargo's unchanged `build.rs` uses bindgen 0.70.1.
+provided by `rules_rs` 0.1.0. Cargo's unchanged `build.rs` uses bindgen 0.70.1.
 Tests validate compilation and behavior; they do not claim byte-for-byte
 equality with Cargo's generated bindings. The Rust library is a source
 dependency; it is not distributed as a precompiled Rust package.

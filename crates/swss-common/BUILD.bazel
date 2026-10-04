@@ -29,8 +29,8 @@ bindings_directory(
     visibility = ["//visibility:public"],
 )
 
-# rules_rs 0.0.99 aliases() includes the dev-only testing crate. Normal
-# dependencies use their standard crate names, so this target needs no aliases.
+# Normal dependencies use their standard crate names, so this target needs no
+# aliases for the dev-only testing crate.
 rust_library(
     name = "swss_common",
     srcs = glob(["src/**/*.rs"]),
