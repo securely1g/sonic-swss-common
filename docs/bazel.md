@@ -6,6 +6,18 @@ Dependencies come from the configured SONiC Bazel registry and the Bazel Central
 Registry; the native GCC 14.2 toolchain and Debian package inputs are downloaded
 by Bazel.
 
+Local builds and normal CI use `sonic-bazel-registry/main` in `.bazelrc`, with
+Bazel Central Registry as the separate third-party registry. Module versions
+and source checksums still select the dependencies; the registry URL does not
+select their latest source code.
+
+The timestamp integration is published on registry `main`. Builds select its
+landed source version through `MODULE.bazel`; no temporary registry override
+is needed.
+
+Package artifacts retain `effective.bazelrc` and the generated module lock for
+dependency inspection.
+
 ## Environment
 
 Use a native AMD64 or ARM64 Linux environment with Debian Trixie userspace. The
@@ -51,6 +63,7 @@ targets=(
   //tests:vrf_ut
   //tests:shared_library_runtime_test
   //dist:libswsscommon_package_test
+  //dist:package_timestamps_test
   //pyext:swsscommon_package_test
 )
 
@@ -156,6 +169,22 @@ Python consumers. Production Make supplies the models through the
 The standalone build produces tar archives. Debian dependency metadata, the
 `libswsscommon-dev` package, and wheel packaging remain owned by the Make
 workflow. GitHub requires you to sign in to download workflow artifacts.
+
+### Reproducible package timestamps
+
+The registry's `tar.bzl` patch adds an optional `default_mtime` setting to `tar()`.
+It supplies timestamps only where the manifest has no explicit or inherited
+time. `sonic_deploy_tar` selects `1672560000` for the library's runtime archive;
+the CLI calls `tar(default_mtime = "1672560000")` directly. The library symlinks
+retain their explicit `time=0`. The Lua package already uses an automatically
+generated manifest with deterministic timestamps.
+
+Common's package test checks its actual library, program, configuration and
+symlink headers. Generic manifest and reproducibility tests accompany the
+`tar.bzl` patch in the registry, and deployment integration tests remain in
+`sonic-build-infra`. The root module pins the patched `tar.bzl` version because
+Bazel otherwise ranks a transitive request for upstream `0.10.5` above
+`0.10.5-sonic.1`.
 
 ## Debug symbols
 

@@ -72,11 +72,14 @@ jobs:
           //tests:shared_library_runtime_test
           //tests:defaultvalueprovider_ut
           //dist:libswsscommon_package_test
+          //dist:package_timestamps_test
           //pyext:swsscommon_package_test
 
       - name: Collect YANG package artifacts
         run: |
           mkdir -p artifacts/yang
+          cp .bazelrc artifacts/yang/effective.bazelrc
+          cp MODULE.bazel.lock artifacts/yang/
           cp \
             bazel-bin/dist/libswsscommon_pkg.tar \
             bazel-bin/dist/libswsscommon_pkg.debug_symbols.tar \
@@ -108,11 +111,14 @@ jobs:
           //tests:vrf_ut
           //tests:shared_library_runtime_test
           //dist:libswsscommon_package_test
+          //dist:package_timestamps_test
           //pyext:swsscommon_package_test
 
       - name: Collect no-YANG package artifacts
         run: |
           mkdir -p artifacts/no-yang
+          cp .bazelrc artifacts/no-yang/effective.bazelrc
+          cp MODULE.bazel.lock artifacts/no-yang/
           cp \
             bazel-bin/dist/libswsscommon_pkg.tar \
             bazel-bin/dist/libswsscommon_pkg.debug_symbols.tar \
