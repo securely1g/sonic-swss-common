@@ -7,6 +7,7 @@ buildifier(
     name = "buildifier",
     exclude_patterns = [
         "./.git/*",
+        "./artifacts/*",
     ],
     lint_mode = "fix",
     mode = "fix",
@@ -16,6 +17,7 @@ buildifier(
     name = "buildifier.check",
     exclude_patterns = [
         "./.git/*",
+        "./artifacts/*",
     ],
     lint_mode = "warn",
     mode = "diff",
@@ -27,6 +29,7 @@ buildifier(
     name = "buildifier.format.check",
     exclude_patterns = [
         "./.git/*",
+        "./artifacts/*",
     ],
     lint_mode = "",
     mode = "diff",
