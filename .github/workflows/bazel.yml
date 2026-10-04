@@ -11,6 +11,8 @@ permissions:
   contents: read
 
 jobs:
+  # Required native checks run independently of the informational CodeQL jobs.
+  # Merge requirements are configured in branch protection; see docs/bazel.md.
   build-and-test:
     name: Bazel (${{ matrix.arch }})
     timeout-minutes: 60

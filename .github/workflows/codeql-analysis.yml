@@ -2,6 +2,8 @@
 
 name: "CodeQL"
 
+# Keep real scan results visible; these checks are informational for merging.
+# Branch protection requires the separate native Bazel checks (docs/bazel.md).
 on:
   push:
     branches:

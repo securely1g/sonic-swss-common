@@ -230,6 +230,22 @@ endpoints and database configuration, matching Trixie native libraries, and a
 loader configuration that can find them. Run that test separately in an
 environment providing those dependencies and services.
 
+## PR checks and merge requirements
+
+For the `securely1g` fork's `master` branch, the required checks are
+`Bazel (AMD64)` and `Bazel (ARM64)`. They build, test and package Common on
+native runners independently of CodeQL.
+
+CodeQL continues to run and report its actual C++ and Python analysis results.
+The `Analyze (cpp)`, `Analyze (python)` and aggregate `CodeQL` checks are
+informational: a pending or failed scan does not block merging. Review findings
+and analysis failures separately; a successful scan does not mean there are no
+findings.
+
+These requirements are managed in the repository's branch-protection settings,
+not by workflow comments. Keep CodeQL out of required-check lists and required
+jobs' dependencies while preserving its triggers and normal failure reporting.
+
 ## CodeQL C++ build
 
 The C++ CodeQL job builds with Bazel inside a native AMD64 Debian Trixie
