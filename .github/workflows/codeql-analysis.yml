@@ -78,7 +78,16 @@ jobs:
     - name: Verify Rust source inputs
       run: |
         test ! -e Cargo.Bazel.lock
+        test -z "$(git ls-files Cargo.Bazel.lock)"
         git ls-files --error-unmatch Cargo.lock
+        test ! -e MODULE.bazel.lock
+        mkdir -p artifacts/validation
+        cp Cargo.lock artifacts/validation/
+        git rev-parse HEAD > artifacts/validation/source-commit.txt
+        git rev-parse HEAD^{tree} > artifacts/validation/source-tree.txt
+        uname -m > artifacts/validation/runner-architecture.txt
+        dpkg --print-architecture > artifacts/validation/userspace-architecture.txt
+        bazel version > artifacts/validation/bazel-version.txt
 
     - name: Record maintained registry inputs
       run: |
@@ -157,6 +166,53 @@ jobs:
     # After environment restoration, restart Bazel before switching features.
     - name: Build and test no-YANG using the same private outputs
       run: python3 .github/scripts/codeql_build_once.py no-yang
+
+    - name: Upload Rust dependency evidence
+      if: always()
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      with:
+        name: sonic-swss-common-codeql-rust-dependencies
+        path: |
+          Cargo.lock
+          MODULE.bazel.lock
+        if-no-files-found: error
+
+    # Collect after the analysis archive is finalized and both native modes
+    # finish, so input probes cannot populate the cache used by reuse checks.
+    - name: Record resolved Go inputs
+      if: always()
+      run: >-
+        python3 tools/bazel/go_validation.py collect artifacts/codeql-go-inputs
+        --output-base-file artifacts/codeql-go-inputs/build-output-base.txt
+
+    - name: Retain Go builder failure evidence
+      if: failure()
+      continue-on-error: true
+      shell: bash
+      run: |
+        if test -f artifacts/codeql-go-inputs/build-output-base.txt; then
+          python3 tools/bazel/diagnose_go_builder.py \
+            --output-base "$(cat artifacts/codeql-go-inputs/build-output-base.txt)" \
+            --destination artifacts/validation/go-builder-failure
+        fi
+
+    - name: Upload Rust validation evidence
+      if: always()
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      with:
+        name: sonic-swss-common-rust-AMD64
+        path: artifacts/validation/
+        if-no-files-found: error
+
+    - name: Upload native validation evidence
+      if: always()
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      with:
+        name: sonic-swss-common-go-validation-AMD64
+        path: |
+          artifacts/validation/
+          artifacts/codeql-go-inputs/
+        if-no-files-found: error
 
 
     - name: Upload YANG package artifacts

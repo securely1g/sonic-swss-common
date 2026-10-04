@@ -23,7 +23,8 @@ ANALYSIS_TARGETS = [
 BUILD_TARGETS = [
     "//:libswsscommon", "//:libswsscommon_shared",
     "//:libswsscommon_consolidated.so", "//:swssloglevel",
-    "//crates/swss-common:bindings_dir", "//dist:libswsscommon_pkg",
+    "//crates/swss-common:bindings_dir", "//crates/swss-common:swss_common",
+    "//dist:libswsscommon_pkg",
     "//dist:libswsscommon_pkg.debug_symbols", "//dist:sonic-db-cli_pkg",
     "//pyext:swsscommon_pkg", "//goext:swsscommon",
 ]
@@ -32,12 +33,41 @@ TEST_TARGETS = [
     "//tests:saiaclschema_ut", "//tests:notification_queue_ut",
     "//tests:interface_ut", "//tests:vrf_ut",
     "//tests:shared_library_runtime_test", "//dist:libswsscommon_package_test",
-    "//pyext:swsscommon_package_test",
+    "//pyext:swsscommon_package_test", "//crates/swss-common:swss_common_test",
+    "//dist:package_timestamps_test",
 ]
 PACKAGES = [
     "dist/libswsscommon_pkg.tar", "dist/libswsscommon_pkg.debug_symbols.tar",
     "dist/sonic-db-cli_pkg.tar", "pyext/swsscommon_pkg.tar.gz",
 ]
+
+
+def collect_native_evidence(output_base, destination):
+    """Retain the maintained native job's Rust/Go results for this build mode."""
+    if Path("Cargo.Bazel.lock").exists():
+        raise RuntimeError("Rust validation must use the tracked Cargo.lock")
+    subprocess.run(["git", "ls-files", "--error-unmatch", "Cargo.lock"], check=True,
+                   stdout=subprocess.DEVNULL)
+    subprocess.run(["git", "diff", "--exit-code", "HEAD", "--", "Cargo.lock"], check=True)
+    logs = Path("bazel-testlogs").resolve(strict=True)
+    if not logs.is_relative_to(Path(output_base).resolve()):
+        raise RuntimeError("bazel-testlogs does not belong to this private build")
+    files = {
+        "Cargo.lock": Path("Cargo.lock"),
+        "MODULE.bazel.lock": Path("MODULE.bazel.lock"),
+        "effective.bazelrc": Path(".bazelrc"),
+    }
+    for prefix, target in (("rust", "crates/swss-common/swss_common_test"),
+                           ("go", "goext/swsscommon_runtime_test")):
+        for name in ("test.xml", "test.log"):
+            files[f"{prefix}/{name}"] = logs / target / name
+    hashes = {}
+    for name, source in files.items():
+        target = destination / name
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(source, target)
+        hashes[name] = hashlib.sha256(target.read_bytes()).hexdigest()
+    return hashes
 
 
 def read_spawns(path):
@@ -106,6 +136,11 @@ def main():
     if traced:
         output_base = tempfile.mkdtemp(prefix="codeql-bazel-", dir=os.environ["RUNNER_TEMP"])
         receipt = {"revision": revision, "output_base": output_base, "configurations": {}}
+        # The maintained Go-input collector must inspect this job's private
+        # output base, including when the traced build later fails.
+        go_inputs = artifacts / "codeql-go-inputs"
+        go_inputs.mkdir(parents=True, exist_ok=True)
+        (go_inputs / "build-output-base.txt").write_text(output_base + "\n")
     else:
         # The workflow restores the tracing environment after analysis.
         # Start a new Bazel server only after that boundary. The YANG source
@@ -185,6 +220,8 @@ def main():
                 shutil.copyfile(source, destination)
                 result["packages"][destination.name] = hashlib.sha256(
                     destination.read_bytes()).hexdigest()
+            result["native_evidence"] = collect_native_evidence(
+                output_base, artifacts / "validation" / mode)
             result["resolution"] = collect_resolution(
                 package_dir / "resolution", mode, "AMD64", bazel)
             receipt["configurations"][mode] = result

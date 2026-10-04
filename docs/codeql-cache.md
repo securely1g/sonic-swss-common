@@ -53,6 +53,15 @@ the existing compiled/package outputs. Build profiles and source-extraction
 receipts are retained with the package hashes. The CodeQL CLI and security query
 suites remain unchanged for this experiment.
 
+The combined AMD64 job also runs the maintained native Rust library test and
+package-timestamp test in both YANG modes. It checks that the tracked Cargo lock
+is unchanged, retains each mode's Rust and Go test logs alongside the generated
+Bazel resolution evidence, and records Go inputs from the same private output
+base after both reuse checks finish. The separate native ARM64 and four cgo
+header configurations keep their existing target coverage. Successful checks
+establish this integration's build and test results; they do not establish
+semantic CodeQL equivalence or a speedup for the experiment.
+
 ## Local experiment on 2026-09-27
 
 The experiment used commit `e8ea05e8e30909fba2b7936359ee392d06ee3d49`, Bazel
