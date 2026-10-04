@@ -219,6 +219,9 @@ def main():
     })
     summary = {"cases": {}}
     with tempfile.TemporaryDirectory(prefix="rules-go-4583-") as temporary:
+        # Bazel tests omit HOME. Give both Bazelisk invocations an explicit
+        # cache directory so the nested version check can find its binary.
+        env["BAZELISK_HOME"] = str(Path(temporary) / "bazelisk")
         workspace = Path(temporary) / "workspace"
         workspace.mkdir()
         (workspace / "MODULE.bazel").write_text(MODULE)
@@ -255,6 +258,7 @@ def main():
                 # Bazelisk prepends its executable directory to PATH. Keep our
                 # evidence wrapper first inside the nested test process.
                 "--test_arg=-test.v", "--test_env=PATH=" + env["PATH"],
+                "--test_env=BAZELISK_HOME=" + env["BAZELISK_HOME"],
                 "--test_env=USE_BAZEL_VERSION=8.5.1", "--test_env=GO_BAZEL_TEST_BAZELFLAGS=",
                 "--test_env=RULES_GO_4583_REAL_BAZEL=" + real_bazel,
                 "--test_env=RULES_GO_4583_CASE_ARTIFACTS=" + str(evidence),
