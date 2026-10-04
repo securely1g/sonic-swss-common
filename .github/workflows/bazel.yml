@@ -216,14 +216,14 @@ jobs:
             --features=${{ matrix.feature }} \
             --execution_log_json_file=artifacts/validation/cgo-actions.json \
             --test_output=errors \
-            //goext:hiredis_cgo_test
+            //goext/tests/hiredis:hiredis_cgo_test
       - name: Collect cgo header evidence
         if: always()
         run: |
           mkdir -p artifacts/validation
           if test -f MODULE.bazel.lock; then cp MODULE.bazel.lock artifacts/validation/; fi
-          if test -d bazel-testlogs/goext/hiredis_cgo_test; then
-            cp -L bazel-testlogs/goext/hiredis_cgo_test/test.log bazel-testlogs/goext/hiredis_cgo_test/test.xml artifacts/validation/
+          if test -d bazel-testlogs/goext/tests/hiredis/hiredis_cgo_test; then
+            cp -L bazel-testlogs/goext/tests/hiredis/hiredis_cgo_test/test.log bazel-testlogs/goext/tests/hiredis/hiredis_cgo_test/test.xml artifacts/validation/
           fi
           git -c safe.directory="$GITHUB_WORKSPACE" diff --exit-code > artifacts/validation/tracked-files.diff
       - name: Upload cgo header evidence
