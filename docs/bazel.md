@@ -50,6 +50,39 @@ rules_cc 0.2.21/0.2.22 require a runtime toolchain type absent from Bazel 8.5.1.
 An external root must repeat this override because module overrides do not
 propagate from dependencies.
 
+## Go build inputs
+
+This branch selects `rules_go 0.64.1-sonic.1`, which adds the remaining relative
+cgo header-path repair to upstream 0.64.1. The root override preserves that
+prerelease selection, and standalone builds retain Go SDK 1.25.0. The original
+upstream regression cases pass with the repair on native AMD64 and ARM64 using
+Bazel 8.5.1 ([validation run](https://github.com/securely1g/sonic-swss-common/actions/runs/37182396550)).
+
+The version is available on the maintained registry through
+[registry PR #37](https://github.com/securely1g/sonic-bazel-registry/pull/37).
+Local builds, native CI and CodeQL use the canonical `main` registry endpoint,
+with BCR as the other registry. The evidence helper records the observed registry
+revision and effective configuration without changing `.bazelrc`.
+
+To retain the same evidence locally, use an empty evidence directory:
+
+```sh
+python3 tools/bazel/go_validation.py record /tmp/common-go-validation
+# Run the appropriate native build/test commands below.
+python3 tools/bazel/go_validation.py collect /tmp/common-go-validation
+```
+
+Add `--config=aarch64` to `collect` on native ARM64. Collection checks the
+resolved module version, reviewed cgo source hash, Bazel 8.5.1, and Go 1.25.0,
+and retains the generated module lock, source files, SDK receipts and repository
+definition. It also verifies that the tracked checkout remains unchanged.
+
+The existing six native jobs retain YANG enabled/disabled coverage and the
+hiredis cgo probe with `external_include_paths` enabled and disabled. Common's
+SWIG wrapper still compiles its generated C++ separately; the dedicated upstream
+regression above covers the relative `cc_import` path that this arrangement does
+not exercise. Package outputs remain tar archives.
+
 ## Build and test
 
 Run the following from the repository root in Bash. Define the common and YANG

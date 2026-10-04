@@ -80,6 +80,11 @@ jobs:
         test ! -e Cargo.Bazel.lock
         git ls-files --error-unmatch Cargo.lock
 
+    - name: Record maintained registry inputs
+      run: |
+        python3 tools/bazel/go_validation.py record artifacts/codeql-go-inputs
+        git rev-parse HEAD > artifacts/codeql-go-inputs/tested-revision.txt
+
     - name: Initialize CodeQL
       uses: github/codeql-action/init@ec3cf9c605b848da5f1e41e8452719eb1ccfb9a6 # v2.1.29
       with:
@@ -92,8 +97,10 @@ jobs:
       shell: bash
       run: |
         codeql_bazel_output_base="$(mktemp -d "$RUNNER_TEMP/codeql-bazel-output.XXXXXX")"
+        echo "$codeql_bazel_output_base" > artifacts/codeql-go-inputs/build-output-base.txt
         trap 'bazel --output_base="$codeql_bazel_output_base" shutdown' EXIT
         bazel --output_base="$codeql_bazel_output_base" build \
+          --lockfile_mode=update \
           --//tools/bazel:yang_modules=True \
           --spawn_strategy=local \
           --nouse_action_cache \
@@ -122,7 +129,21 @@ jobs:
           MODULE.bazel.lock
         if-no-files-found: error
 
+    - name: Record resolved Go inputs
+      if: always()
+      run: >-
+        python3 tools/bazel/go_validation.py collect artifacts/codeql-go-inputs
+        --output-base-file artifacts/codeql-go-inputs/build-output-base.txt
+
     - name: Perform CodeQL Analysis
       uses: github/codeql-action/analyze@ec3cf9c605b848da5f1e41e8452719eb1ccfb9a6 # v2.1.29
       with:
         category: "/language:cpp"
+
+    - name: Upload resolved build inputs
+      if: always()
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      with:
+        name: sonic-swss-common-codeql-go-inputs
+        path: artifacts/codeql-go-inputs/
+        if-no-files-found: error

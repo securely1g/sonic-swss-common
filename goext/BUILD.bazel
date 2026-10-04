@@ -41,10 +41,8 @@ cc_library(
     deps = ["//:common_deps"],
 )
 
-# Compile the SWIG-generated C++ wrapper as a cc_library so that transitive
-# include paths (hiredis, boost, etc.) propagate correctly. rules_go CGO does
-# not propagate include paths from cc_library deps, so compiling the .cxx
-# inside go_library would fail to find transitive headers.
+# Compile the SWIG-generated wrapper with the C++ toolchain. The separate
+# //goext/tests/hiredis target checks cgo header propagation through common_deps.
 cc_library(
     name = "swsscommon_wrap_cc",
     srcs = [
