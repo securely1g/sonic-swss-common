@@ -4,11 +4,9 @@ The standalone build uses Bazel 8.5.1, selected by `.bazelversion`. Install
 [Bazelisk](https://bazel.build/install/bazelisk) and invoke it as `bazel`.
 Dependencies come from the configured SONiC Bazel registry and the Bazel Central
 Registry; the native GCC 14.2 toolchain and Debian package inputs are downloaded
-by Bazel. Local builds use the reviewed registry snapshot recorded in `.bazelrc`.
-CI replaces that endpoint with the maintained candidate branch
-`codex/shared-rust-deps-20261003` to validate the shared Rust registration before
-it reaches `main`. Both select one SONiC registry followed by the Bazel Central
-Registry.
+by Bazel. Local builds use the landed registry snapshot recorded in `.bazelrc`.
+CI replaces that endpoint with the maintained `main` branch. Both select one
+SONiC registry followed by the Bazel Central Registry.
 
 ## Environment
 

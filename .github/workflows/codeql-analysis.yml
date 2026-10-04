@@ -81,9 +81,9 @@ jobs:
         from pathlib import Path
         path = Path(".bazelrc")
         text = path.read_text()
-        reviewed = "https://raw.githubusercontent.com/securely1g/sonic-bazel-registry/23c5dd47421393967b0a4790470131d8829cfe9d"
+        reviewed = "https://raw.githubusercontent.com/securely1g/sonic-bazel-registry/bfdd452e7c89d082b94d01f7135614066f280c3c"
         assert text.count(reviewed) == 1, "Expected one reviewed SONiC registry endpoint"
-        path.write_text(text.replace(reviewed, "https://raw.githubusercontent.com/securely1g/sonic-bazel-registry/codex/shared-rust-deps-20261003"))
+        path.write_text(text.replace(reviewed, "https://raw.githubusercontent.com/securely1g/sonic-bazel-registry/main"))
         PYTHON
 
     - name: Prepare Rust dependency metadata

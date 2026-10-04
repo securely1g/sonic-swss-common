@@ -1,8 +1,8 @@
 common --check_direct_dependencies=off
 common --noincompatible_disallow_empty_glob
 
-# Use a reviewed registry snapshot locally; CI selects the maintained candidate branch.
-common --registry=https://raw.githubusercontent.com/securely1g/sonic-bazel-registry/23c5dd47421393967b0a4790470131d8829cfe9d
+# Use a reviewed registry snapshot locally; CI selects maintained main.
+common --registry=https://raw.githubusercontent.com/securely1g/sonic-bazel-registry/bfdd452e7c89d082b94d01f7135614066f280c3c
 # If a dependency is not found there, use the Bazel Central Registry
 common --registry=https://bcr.bazel.build/
 
