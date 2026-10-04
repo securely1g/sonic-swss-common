@@ -1,4 +1,5 @@
 load("@rules_cc//cc:defs.bzl", "cc_library")
+load("@rules_rust//rust:defs.bzl", "rust_library", "rust_test")
 load("@rules_rust_bindgen//:defs.bzl", "rust_bindgen")
 load("//tools/bazel/rust:bindings.bzl", "bindings_directory", "c_api_header")
 
@@ -20,10 +21,36 @@ rust_bindgen(
     merge_cc_lib_objects_into_rlib = False,
 )
 
-# crate_universe consumers use this directory as Cargo's OUT_DIR after
-# disabling build.rs. The native library must come from this same module.
+# Keep the generated bindings available to consumers that need the raw C API.
 bindings_directory(
     name = "bindings_dir",
     src = ":bindings.rs",
     visibility = ["//visibility:public"],
+)
+
+rust_library(
+    name = "swss_common",
+    srcs = glob(["src/**/*.rs"]),
+    compile_data = [":bindings_dir"],
+    crate_name = "swss_common",
+    crate_root = "src/lib.rs",
+    edition = "2021",
+    link_deps = ["//:libswsscommon_shared"],
+    proc_macro_deps = ["@sonic_rust_deps//:getset"],
+    rustc_env = {"OUT_DIR": "$(execpath :bindings_dir)"},
+    rustc_flags = ["-Cdebuginfo=2"],
+    version = "0.1.0",
+    visibility = ["//visibility:public"],
+    deps = [
+        "@sonic_rust_deps//:lazy_static",
+        "@sonic_rust_deps//:libc",
+        "@sonic_rust_deps//:serde",
+        "@sonic_rust_deps//:tracing-subscriber",
+    ],
+)
+
+rust_test(
+    name = "swss_common_test",
+    crate = ":swss_common",
+    experimental_use_cc_common_link = 1,
 )
