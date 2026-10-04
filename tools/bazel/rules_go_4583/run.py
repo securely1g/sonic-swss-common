@@ -252,7 +252,9 @@ def main():
             command = [
                 *bazel, "test", "//:cc_header_inputs_test",
                 "--lockfile_mode=update", "--nocache_test_results", "--test_output=all",
-                "--test_arg=-test.v", "--test_env=PATH",
+                # Bazelisk prepends its executable directory to PATH. Keep our
+                # evidence wrapper first inside the nested test process.
+                "--test_arg=-test.v", "--test_env=PATH=" + env["PATH"],
                 "--test_env=USE_BAZEL_VERSION=8.5.1", "--test_env=GO_BAZEL_TEST_BAZELFLAGS=",
                 "--test_env=RULES_GO_4583_REAL_BAZEL=" + real_bazel,
                 "--test_env=RULES_GO_4583_CASE_ARTIFACTS=" + str(evidence),
