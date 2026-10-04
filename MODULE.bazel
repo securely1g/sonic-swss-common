@@ -18,7 +18,7 @@ bazel_dep(name = "rules_rs", version = "0.1.0")
 
 # rules_rs selects rules_cc with sanitize_pwd; rules_go 0.64.1 excludes that
 # C/C++ feature from cgo so its builder paths stay valid after changing cwd.
-bazel_dep(name = "rules_go", version = "0.64.1", repo_name = "io_bazel_rules_go")
+bazel_dep(name = "rules_go", version = "0.64.1-sonic.1", repo_name = "io_bazel_rules_go")
 bazel_dep(name = "rules_cc", version = "0.2.20")
 bazel_dep(name = "rules_pkg", version = "1.1.0")
 bazel_dep(name = "rules_shell", version = "0.6.1")
@@ -46,8 +46,14 @@ single_version_override(
     version = "0.2.20",
 )
 
-# Preserve the SDK previously selected by rules_go 0.60.0. Consuming roots
-# provide their own SDK configuration.
+# Keep the relative cgo header repair selected over the upstream stable release.
+single_version_override(
+    module_name = "rules_go",
+    version = "0.64.1-sonic.1",
+)
+
+# Preserve the standalone SDK used before the rules_go update. A consuming root
+# can provide its own SDK configuration.
 go_sdk = use_extension("@io_bazel_rules_go//go:extensions.bzl", "go_sdk", dev_dependency = True)
 go_sdk.download(version = "1.25.0")
 
