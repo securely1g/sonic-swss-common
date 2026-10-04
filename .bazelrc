@@ -17,6 +17,3 @@ common:aarch64 --platforms=@sonic_build_infra//platforms:aarch64_trixie
 
 # Rust 1.90's allocator shim is required when the C++ toolchain links Rust tests.
 build --@rules_rust//rust/settings:experimental_use_allocator_libraries_with_mangled_symbols=True
-
-# Preparation selects one writable shared Rust dependency module.
-try-import %workspace%/artifacts/rust-deps/overrides.bazelrc

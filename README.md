@@ -73,15 +73,11 @@ sudo apt-get install -y --no-install-recommends \
   binutils build-essential ca-certificates git python3 tar
 ```
 
-From the repository root, prepare the generated Rust dependency metadata, then
-build the C++ shared library and package archives. Common and SWSS use the same
-third-party crates from `sonic-rust-deps`. Preparation preserves Common's
-committed `Cargo.lock` and generates the shared module's Bazel metadata under
-`artifacts/rust-deps/`, which is ignored by Git.
+From the repository root, build the C++ shared library and package archives.
+`rules_rs` resolves Rust dependencies directly from the committed `Cargo.toml`
+and `Cargo.lock`; no separate Rust preparation command is needed.
 
 ```sh
-python3 tools/bazel/prepare_rust.py --receipt artifacts/rust-preparation.json
-
 # Native AMD64
 bazel build --//tools/bazel:yang_modules=True \
   //:libswsscommon_shared \

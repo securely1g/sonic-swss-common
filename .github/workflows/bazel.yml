@@ -3,7 +3,7 @@ name: Bazel
 on:
   workflow_dispatch:
   pull_request:
-    branches: [master]
+    branches: [master, codex/rust-library]
   push:
     branches: [master]
 
@@ -57,35 +57,14 @@ jobs:
           path.write_text(text.replace(reviewed, "https://raw.githubusercontent.com/securely1g/sonic-bazel-registry/main"))
           PYTHON
 
-      - name: Prepare Rust dependency metadata
+      - name: Record Rust source inputs
         shell: bash
         run: |
-          python3 -m unittest discover -s tools/bazel -p prepare_rust_test.py
-          test ! -e artifacts/rust-deps/overrides.bazelrc
           test ! -e Cargo.Bazel.lock
           test -z "$(git ls-files Cargo.Bazel.lock)"
           git ls-files --error-unmatch Cargo.lock
-          args=()
-          if [[ '${{ matrix.arch }}' == ARM64 ]]; then
-            args+=(--bazel-arg=--config=aarch64)
-          fi
-          python3 tools/bazel/prepare_rust.py \
-            --receipt artifacts/validation/rust-preparation.json "${args[@]}"
-          git diff --exit-code HEAD -- Cargo.lock
-          test ! -e Cargo.Bazel.lock
-          git check-ignore artifacts/rust-deps/overrides.bazelrc
+          mkdir -p artifacts/validation
           cp Cargo.lock artifacts/validation/
-          python3 - <<'PYTHON'
-          import json
-          from pathlib import Path
-          import shutil
-          receipt = json.loads(Path("artifacts/validation/rust-preparation.json").read_text())
-          shared = Path(receipt["shared_dependency"]["workspace"])
-          destination = Path("artifacts/validation/shared-rust-deps")
-          destination.mkdir(parents=True, exist_ok=True)
-          for name in ("Cargo.toml", "Cargo.lock", "Cargo.Bazel.lock", "MODULE.bazel.lock"):
-              shutil.copy2(shared / name, destination / name)
-          PYTHON
           git rev-parse HEAD > artifacts/validation/source-commit.txt
           git rev-parse HEAD^{tree} > artifacts/validation/source-tree.txt
 
@@ -125,6 +104,7 @@ jobs:
 
       - name: Collect YANG package artifacts
         run: |
+          test ! -e Cargo.Bazel.lock
           git diff --exit-code HEAD -- Cargo.lock
           mkdir -p artifacts/yang artifacts/validation/yang
           cp bazel-testlogs/crates/swss-common/swss_common_test/test.xml bazel-testlogs/crates/swss-common/swss_common_test/test.log artifacts/validation/yang/
@@ -167,6 +147,7 @@ jobs:
 
       - name: Collect no-YANG package artifacts
         run: |
+          test ! -e Cargo.Bazel.lock
           git diff --exit-code HEAD -- Cargo.lock
           mkdir -p artifacts/no-yang artifacts/validation/no-yang
           cp bazel-testlogs/crates/swss-common/swss_common_test/test.xml bazel-testlogs/crates/swss-common/swss_common_test/test.log artifacts/validation/no-yang/
