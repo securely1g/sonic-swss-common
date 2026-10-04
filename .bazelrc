@@ -1,8 +1,9 @@
 common --check_direct_dependencies=off
 common --noincompatible_disallow_empty_glob
 
-# Use the maintained SONiC registry branch for local builds and CI.
-common --registry=https://raw.githubusercontent.com/securely1g/sonic-bazel-registry/main
+# Pin the reviewed registry snapshot for local builds. CI replaces this single
+# endpoint with the matching maintained branch using tools/bazel/ci_registry.py.
+common --registry=https://raw.githubusercontent.com/securely1g/sonic-bazel-registry/534b1873246c6e0c6cf913c1305f1c642432ff04
 # If a dependency is not found there, use the Bazel Central Registry
 common --registry=https://bcr.bazel.build/
 
