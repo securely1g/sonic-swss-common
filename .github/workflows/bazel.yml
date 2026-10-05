@@ -13,7 +13,7 @@ permissions:
 jobs:
   build-and-test:
     name: Bazel (${{ matrix.arch }})
-    timeout-minutes: 60
+    timeout-minutes: 90
     strategy:
       fail-fast: false
       matrix:
@@ -45,6 +45,9 @@ jobs:
           repository-cache: true
           disk-cache: ${{ github.workflow }}
           cache-version: "8.5.1"
+
+      - name: Test registry evidence checks
+        run: python3 -m unittest discover -s tools/bazel -p go_validation_test.py -v
 
       - name: Record Rust source inputs
         shell: bash
@@ -92,6 +95,7 @@ jobs:
           //crates/swss-common:bindings_dir
           //crates/swss-common:swss_common
           //crates/swss-common:swss_common_test
+          //tools/bazel/rust:shared_serde_test
           //dist:libswsscommon_pkg
           //dist:libswsscommon_pkg.debug_symbols
           //dist:sonic-db-cli_pkg
@@ -114,9 +118,11 @@ jobs:
           test ! -e Cargo.Bazel.lock
           git diff --exit-code HEAD -- Cargo.lock
           mkdir -p artifacts/yang artifacts/validation/yang
-          cp .bazelrc artifacts/yang/effective.bazelrc
+          cp artifacts/validation/effective.bazelrc artifacts/yang/effective.bazelrc
           cp MODULE.bazel.lock artifacts/yang/
           cp bazel-testlogs/crates/swss-common/swss_common_test/test.xml bazel-testlogs/crates/swss-common/swss_common_test/test.log artifacts/validation/yang/
+          mkdir -p artifacts/validation/yang/shared-serde
+          cp bazel-testlogs/tools/bazel/rust/shared_serde_test/test.xml bazel-testlogs/tools/bazel/rust/shared_serde_test/test.log artifacts/validation/yang/shared-serde/
           cp MODULE.bazel.lock artifacts/validation/yang/
           mkdir -p artifacts/validation/yang/go
           cp -L bazel-testlogs/goext/swsscommon_runtime_test/test.log bazel-testlogs/goext/swsscommon_runtime_test/test.xml artifacts/validation/yang/go/
@@ -146,6 +152,7 @@ jobs:
           //crates/swss-common:bindings_dir
           //crates/swss-common:swss_common
           //crates/swss-common:swss_common_test
+          //tools/bazel/rust:shared_serde_test
           //dist:libswsscommon_pkg
           //dist:libswsscommon_pkg.debug_symbols
           //dist:sonic-db-cli_pkg
@@ -167,9 +174,11 @@ jobs:
           test ! -e Cargo.Bazel.lock
           git diff --exit-code HEAD -- Cargo.lock
           mkdir -p artifacts/no-yang artifacts/validation/no-yang
-          cp .bazelrc artifacts/no-yang/effective.bazelrc
+          cp artifacts/validation/effective.bazelrc artifacts/no-yang/effective.bazelrc
           cp MODULE.bazel.lock artifacts/no-yang/
           cp bazel-testlogs/crates/swss-common/swss_common_test/test.xml bazel-testlogs/crates/swss-common/swss_common_test/test.log artifacts/validation/no-yang/
+          mkdir -p artifacts/validation/no-yang/shared-serde
+          cp bazel-testlogs/tools/bazel/rust/shared_serde_test/test.xml bazel-testlogs/tools/bazel/rust/shared_serde_test/test.log artifacts/validation/no-yang/shared-serde/
           cp MODULE.bazel.lock artifacts/validation/no-yang/
           mkdir -p artifacts/validation/no-yang/go
           cp -L bazel-testlogs/goext/swsscommon_runtime_test/test.log bazel-testlogs/goext/swsscommon_runtime_test/test.xml artifacts/validation/no-yang/go/

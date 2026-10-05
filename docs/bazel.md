@@ -38,11 +38,17 @@ apt-get install -y --no-install-recommends \
 
 ## Rust dependency resolution
 
-`rules_rs` resolves dependencies directly from Common's committed `Cargo.toml`
-and `Cargo.lock` when Bazel evaluates the module graph. A clean checkout needs
-no preparation script or `Cargo.Bazel.lock`. Keep `Cargo.lock` in Git and update
-it with Cargo when intentionally changing dependencies. The generated
-`MODULE.bazel.lock` stays ignored and is retained with CI evidence.
+Common uses the third-party Rust targets published by the pinned
+`sonic-rust-deps` registry module. That module resolves its committed Cargo
+inputs with `rules_rs` and owns the shared Serde features. Common's Rust BUILD
+file lists its five normal dependencies explicitly; it does not create a second
+Cargo dependency graph. Their versions and checksums match Common's `Cargo.lock`.
+
+A clean checkout needs no preparation script or `Cargo.Bazel.lock`. Keep
+Common's Cargo files in Git for Cargo builds. When changing dependencies, update
+the owning shared module and check its lock against the affected Cargo inputs
+before updating the module pin. The generated `MODULE.bazel.lock` stays ignored
+and is retained with CI evidence.
 
 The Bazel 8.5.1 root selects `rules_cc` 0.2.20 with a
 `single_version_override`. Distroless uses its private C++ import rule, and
@@ -100,6 +106,7 @@ targets=(
   //crates/swss-common:bindings_dir
   //crates/swss-common:swss_common
   //crates/swss-common:swss_common_test
+  //tools/bazel/rust:shared_serde_test
   //dist:libswsscommon_pkg
   //dist:libswsscommon_pkg.debug_symbols
   //dist:sonic-db-cli_pkg
@@ -158,7 +165,8 @@ link to `//:libswsscommon_shared`. The default library has Cargo's `async`
 feature disabled. Its four existing unit tests run without a Redis server:
 
 ```sh
-bazel test //crates/swss-common:swss_common_test
+bazel test //crates/swss-common:swss_common_test \
+  //tools/bazel/rust:shared_serde_test
 ```
 
 Add `--config=aarch64` on native ARM64. CI runs the library and unit tests on
@@ -166,10 +174,13 @@ native AMD64 and ARM64 in both YANG modes. Redis-backed Cargo integration tests
 and the optional async feature are outside this Bazel test target.
 
 Bazel consumers depend on `@sonic-swss-common//crates/swss-common:swss_common`.
-Common also exposes its locked `serde` and `serde_core` targets through aliases.
-SWSS maps its generated Common and Serde repositories to those aliases so its
-serializers use the same compiled traits implemented by Common's `CxxString`.
-The downstream `common_rust_test` checks this boundary with a JSON roundtrip.
+Common and SWSS both use `@sonic_rust_deps//:serde` and
+`@sonic_rust_deps//:serde_core`, currently version 1.0.228. The shared module owns
+the compiled traits and their feature selection; Common no longer exports Serde
+aliases. Direct dependencies work when Common is built alone or imported by
+another root, without repository overrides. The `shared_serde_test` exercises
+Common's `CxxString` through both shared trait APIs, and SWSS's downstream
+`common_rust_test` checks the boundary with a JSON roundtrip.
 
 Common retains its own library, native link dependencies, bindings, and tests.
 Consumers must register compatible Rust and bindgen toolchains because Common's
@@ -201,9 +212,10 @@ artifact for your architecture and feature mode from the **Artifacts** section:
 - `sonic-swss-common-no-yang-ARM64`
 
 The separate `sonic-swss-common-rust-AMD64` and
-`sonic-swss-common-rust-ARM64` artifacts retain the Rust unit-test XML, logs, and Bazel
-module lockfile for each YANG mode, Common's source `Cargo.lock`, and the tested
-source commit and tree. The CodeQL job retains the Cargo and Bazel module locks.
+`sonic-swss-common-rust-ARM64` artifacts retain the Rust unit-test and shared
+Serde test XML and logs, the Bazel module lockfile for each YANG mode, Common's
+source `Cargo.lock`, and the tested source commit and tree. The CodeQL job retains
+the Cargo and Bazel module locks.
 
 Every package download contains these four archives:
 

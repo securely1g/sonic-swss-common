@@ -1,7 +1,7 @@
 # Keep bazel_compatibility in sync with sonic-buildimage's .bazelversion.
 module(
     name = "sonic-swss-common",
-    version = "0.0.1",
+    version = "0.0.2",
     bazel_compatibility = [
         ">=8.5.1",
         "<=8.5.1",
@@ -15,6 +15,7 @@ bazel_dep(name = "googletest", version = "1.11.0", repo_name = "com_google_googl
 bazel_dep(name = "glog", version = "0.5.0", repo_name = "com_github_google_glog")
 bazel_dep(name = "rules_python", version = "1.7.0")
 bazel_dep(name = "rules_rs", version = "0.1.0")
+bazel_dep(name = "sonic-rust-deps", version = "0.0.2-127e89b9396824166caa6a300872398c6896bfec", repo_name = "sonic_rust_deps")
 
 # rules_rs selects rules_cc with sanitize_pwd; rules_go 0.64.1 excludes that
 # C/C++ feature from cgo so its builder paths stay valid after changing cwd.
@@ -99,32 +100,6 @@ register_toolchains(
     "@rules_rust_bindgen//:all",
     dev_dependency = True,
 )
-
-# Common owns the Rust library's third-party dependencies as well as its C API.
-# Resolve them directly from the tracked Cargo lock in every consuming module.
-crate = use_extension("@rules_rs//rs:extensions.bzl", "crate")
-
-# Serde traits cross Common's public API. Enable the additional feature used by
-# downstream SWSS without changing Common's Cargo manifest.
-crate.annotation(
-    crate = "serde",
-    crate_features = ["alloc"],
-)
-crate.annotation(
-    crate = "serde_core",
-    crate_features = ["alloc"],
-)
-crate.from_cargo(
-    name = "swss_common_crates",
-    cargo_lock = "//:Cargo.lock",
-    cargo_toml = "//:Cargo.toml",
-    platform_triples = [
-        "aarch64-unknown-linux-gnu",
-        "x86_64-unknown-linux-gnu",
-    ],
-    use_legacy_rules_rust_platforms = True,
-)
-use_repo(crate, "swss_common_crates")
 
 # The actual dependencies are listed in sonic-build-infra, and re-exported.
 apt = use_extension("@rules_distroless//apt:extensions.bzl", "apt")
