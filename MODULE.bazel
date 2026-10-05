@@ -15,7 +15,7 @@ bazel_dep(name = "googletest", version = "1.11.0", repo_name = "com_google_googl
 bazel_dep(name = "glog", version = "0.5.0", repo_name = "com_github_google_glog")
 bazel_dep(name = "rules_python", version = "1.7.0")
 bazel_dep(name = "rules_rs", version = "0.1.0")
-bazel_dep(name = "sonic-rust-deps", version = "0.0.2-94bb7d11851d4af5f4d436b3d025be25ba2c1278", repo_name = "sonic_rust_deps")
+bazel_dep(name = "sonic-rust-deps", version = "0.0.2-127e89b9396824166caa6a300872398c6896bfec", repo_name = "sonic_rust_deps")
 
 # rules_rs selects rules_cc with sanitize_pwd; rules_go 0.64.1 excludes that
 # C/C++ feature from cgo so its builder paths stay valid after changing cwd.
