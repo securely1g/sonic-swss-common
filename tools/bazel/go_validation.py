@@ -4,6 +4,7 @@
 import argparse
 import hashlib
 import json
+import os
 from pathlib import Path
 import re
 import shutil
@@ -21,20 +22,51 @@ def write_json(path, value):
     path.write_text(json.dumps(value, indent=2, sort_keys=True) + "\n")
 
 
+def selected_registry():
+    """Select main unless Draft CI explicitly supplies its reviewed branch."""
+    url = os.environ.get("SONIC_BAZEL_REGISTRY_URL", MAIN)
+    prefix = MAIN.removesuffix("main")
+    branch = url.removeprefix(prefix)
+    if (not url.startswith(prefix)
+            or re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_./-]*", branch) is None
+            or any(part in branch for part in ("..", "//", "/."))
+            or branch.endswith(("/", ".", ".lock"))
+            or re.fullmatch(r"[0-9a-fA-F]{40}", branch)):
+        raise ValueError("Expected a maintained or reviewed Draft SONiC registry branch URL")
+    return url, "refs/heads/" + branch
+
+
+def check_registry_options(output):
+    registry, _ = selected_registry()
+    options = re.findall(r"--registry=(\S+)", output)
+    sonic_options = [url for url in options if "securely1g/sonic-bazel-registry/" in url]
+    if sonic_options != [registry]:
+        raise ValueError("The effective Bazel options must select exactly the recorded SONiC registry endpoint")
+
+
 def record(artifacts):
     configuration = (ROOT / ".bazelrc").read_text()
     endpoints = [line for line in configuration.splitlines()
                  if "--registry=" in line and "securely1g/sonic-bazel-registry/" in line]
     if endpoints != ["common --registry=" + MAIN]:
         raise ValueError("Expected exactly the canonical SONiC main registry endpoint")
+    registry, ref = selected_registry()
     revision = subprocess.check_output(
         ["git", "-c", "safe.directory=" + str(ROOT), "ls-remote", REGISTRY_REPO,
-         "refs/heads/main"], cwd=ROOT, text=True).split()
-    if len(revision) != 2 or revision[1] != "refs/heads/main":
-        raise ValueError("Could not determine the maintained registry revision")
-    (artifacts / "effective.bazelrc").write_text(configuration)
+         ref], cwd=ROOT, text=True).split()
+    if (len(revision) != 2 or revision[1] != ref
+            or re.fullmatch(r"[0-9a-f]{40}", revision[0]) is None):
+        raise ValueError("Could not determine the selected registry branch revision")
+    expected_revision = os.environ.get("SONIC_BAZEL_REGISTRY_REVISION")
+    if expected_revision is not None and expected_revision != revision[0]:
+        raise ValueError("The registry branch differs from the revision selected for this validation")
+    (artifacts / "declared.bazelrc").write_text(configuration)
+    if registry == MAIN:
+        (artifacts / "effective.bazelrc").write_text(configuration)
     write_json(artifacts / "registry-inputs.json", {
-        "registry": MAIN, "observed_revision": revision[0],
+        "declared_registry": MAIN,
+        "registry": registry, "observed_revision": revision[0],
+        "draft_validation": registry != MAIN,
         "module": "rules_go@" + VERSION,
     })
 
@@ -43,6 +75,9 @@ def collect(artifacts, config, output_base_file=None):
     errors = []
     receipts = {}
     try:
+        recorded = json.loads((artifacts / "registry-inputs.json").read_text())
+        if recorded["registry"] != selected_registry()[0]:
+            raise ValueError("Registry selection changed after recording validation inputs")
         bazel = ["bazel"]
         if output_base_file:
             bazel.append("--output_base=" + output_base_file.read_text().strip())
@@ -60,10 +95,10 @@ def collect(artifacts, config, output_base_file=None):
             if result.returncode:
                 errors.append(name + " failed")
         output_lines = (artifacts / "output-base.txt").read_text().splitlines()
-        registry_options = re.findall(r"--registry=(\S+)", "\n".join(output_lines))
-        sonic_options = [url for url in registry_options if "securely1g/sonic-bazel-registry/" in url]
-        if sonic_options != [MAIN]:
-            errors.append("The effective Bazel options do not select exactly the maintained main registry endpoint")
+        try:
+            check_registry_options("\n".join(output_lines))
+        except ValueError as error:
+            errors.append(str(error))
         bases = [Path(line) for line in output_lines if line.startswith("/") and Path(line).is_dir()]
         if not bases:
             raise ValueError("Bazel output base was not recorded")

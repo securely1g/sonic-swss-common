@@ -2,7 +2,6 @@ load("@rules_cc//cc:defs.bzl", "cc_library")
 load("@rules_rs//rs:rules_rust_bindgen.bzl", "rust_bindgen")
 load("@rules_rs//rs:rust_library.bzl", "rust_library")
 load("@rules_rs//rs:rust_test.bzl", "rust_test")
-load("@swss_common_crates//:defs.bzl", "all_crate_deps")
 load("//tools/bazel/rust:bindings.bzl", "bindings_directory", "c_api_header")
 
 c_api_header(
@@ -29,8 +28,8 @@ bindings_directory(
     visibility = ["//visibility:public"],
 )
 
-# Normal dependencies use their standard crate names, so this target needs no
-# aliases for the dev-only testing crate.
+# Shared third-party targets keep public Serde traits identical in Common and
+# its consumers, including when Common is an external module.
 rust_library(
     name = "swss_common",
     srcs = glob(["src/**/*.rs"]),
@@ -43,7 +42,13 @@ rust_library(
     rustc_flags = ["-Cdebuginfo=2"],
     version = "0.1.0",
     visibility = ["//visibility:public"],
-    deps = all_crate_deps(normal = True),
+    deps = [
+        "@sonic_rust_deps//:getset",
+        "@sonic_rust_deps//:lazy_static",
+        "@sonic_rust_deps//:libc",
+        "@sonic_rust_deps//:serde",
+        "@sonic_rust_deps//:tracing-subscriber",
+    ],
 )
 
 rust_test(
@@ -52,24 +57,10 @@ rust_test(
     experimental_use_cc_common_link = 1,
 )
 
-# Common's public types implement Serde traits. Consumers must use these
-# same crate targets rather than compile a second instance of those traits.
-alias(
-    name = "serde",
-    actual = "@swss_common_crates//:serde-1.0.228",
-    visibility = ["//visibility:public"],
-)
-
 # rules_rs names the Cargo Git dependency after the package. This alias lets a
 # consuming root map that repository to Common's source-owned Bazel target.
 alias(
     name = "swss-common",
     actual = ":swss_common",
-    visibility = ["//visibility:public"],
-)
-
-alias(
-    name = "serde_core",
-    actual = "@swss_common_crates//:serde_core-1.0.228",
     visibility = ["//visibility:public"],
 )
