@@ -46,10 +46,6 @@ jobs:
           disk-cache: ${{ github.workflow }}
           cache-version: "8.5.1"
 
-      # Temporary: the shared module and Common registry entries are unmerged.
-      - name: Select shared Serde registry for Draft validation
-        run: python3 .github/scripts/draft_registry.py artifacts/validation
-
       - name: Test registry evidence checks
         run: python3 -m unittest discover -s tools/bazel -p go_validation_test.py -v
 
@@ -271,10 +267,6 @@ jobs:
           repository-cache: true
           disk-cache: ${{ github.workflow }}-cgo-headers
           cache-version: "8.5.1"
-      # Temporary: the shared module and Common registry entries are unmerged.
-      - name: Select shared Serde registry for Draft validation
-        run: python3 .github/scripts/draft_registry.py artifacts/validation
-
       - name: Record maintained registry inputs
         run: python3 tools/bazel/go_validation.py record artifacts/validation
       - name: Test direct cgo use of the imported hiredis headers
