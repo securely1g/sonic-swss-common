@@ -74,8 +74,9 @@ sudo apt-get install -y --no-install-recommends \
 ```
 
 From the repository root, build the C++ shared library and package archives.
-`rules_rs` resolves Rust dependencies directly from the committed `Cargo.toml`
-and `Cargo.lock`; no separate Rust preparation command is needed.
+Rust dependencies come from the pinned `sonic-rust-deps` registry module;
+no separate Rust preparation command is needed. Common and SWSS use its shared
+Serde targets so their public serialization traits remain compatible.
 
 ```sh
 # Native AMD64
