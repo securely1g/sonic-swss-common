@@ -112,6 +112,7 @@ targets=(
   //dist:sonic-db-cli_pkg
   //dist:sonic-db-cli_pkg.debug_symbols
   //pyext:swsscommon_pkg
+  //pyext:swsscommon_pkg.debug_symbols
   //goext:swsscommon
   //goext:swsscommon_runtime_test
   //tests:status_code_util_test
@@ -219,7 +220,7 @@ Serde test XML and logs, the Bazel module lockfile for each YANG mode, Common's
 source `Cargo.lock`, and the tested source commit and tree. The CodeQL job retains
 the Cargo and Bazel module locks.
 
-Every package download contains these five archives:
+Every package download contains these six archives:
 
 - `libswsscommon_pkg.tar`: `libswsscommon.so.0`, `libsonicdbcli.so.0`, `swssloglevel`, Lua files, and
   database configuration.
@@ -227,7 +228,8 @@ Every package download contains these five archives:
   two runtime libraries and `swssloglevel` in `libswsscommon_pkg.tar`.
 - `sonic-db-cli_pkg.tar`: database CLI.
 - `sonic-db-cli_pkg.debug_symbols.tar`: detached symbols for the database CLI.
-- `swsscommon_pkg.tar.gz`: Python bindings.
+- `swsscommon_pkg.tar.gz`: Python bindings with a stripped native extension.
+- `swsscommon_pkg.debug_symbols.tar`: matching debug information for that extension.
 
 ### Dependency runtime packages
 
@@ -375,3 +377,16 @@ errors when GCC compiles the generated code. The directives in
 Python uses `%naturalvar` to retain class attributes with value-style wrapping,
 while Go uses explicit `%extend` getters and `%ignore` for the problematic
 automatic wrappers. `%naturalvar` alone does not correct the Go-generated code.
+
+### Python binding debug symbols
+
+`//pyext:swsscommon_pkg` installs the Python wrapper and a stripped native
+extension. `//pyext:swsscommon_pkg.debug_symbols` contains that extension's
+matching DWARF files under `/usr/lib/debug/.build-id`. Use the runtime archive
+in the normal container and add its symbol archive to the debug container.
+Both come from the same compilation with `-g` and `--strip=never` before
+packaging splits them. The installed-package test imports the selected YANG
+API and verifies build IDs, debug-link checksums and GDB source lookup.
+
+The installed archive uses ordinary Python imports; it does not contain the
+Bazel runfiles loader. Bazel Python consumers still use `//pyext:swsscommon`.
