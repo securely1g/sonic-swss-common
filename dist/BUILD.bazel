@@ -51,12 +51,15 @@ DIST_LOOSE_COMMON_MTREE = [
         srcs = DIST_LOOSE_SRCS,
         binaries = {
             "usr/lib/{}/libswsscommon.so.0.0.0 type=file mode=0555".format(multiarch): "//:libswsscommon_consolidated.so",
+            "usr/lib/{}/libsonicdbcli.so.0.0.0 type=file mode=0555".format(multiarch): "//sonic-db-cli:libsonicdbcli.so.0",
             "usr/bin/swssloglevel type=file mode=0755": "//:swssloglevel",
         },
         force_debug_build = True,
         mtree = [
             "usr/lib/{}/libswsscommon.so.0 type=link time=0 link=libswsscommon.so.0.0.0".format(multiarch),
             "usr/lib/{}/libswsscommon.so type=link time=0 link=libswsscommon.so.0".format(multiarch),
+            "usr/lib/{}/libsonicdbcli.so.0 type=link time=0 link=libsonicdbcli.so.0.0.0".format(multiarch),
+            "usr/lib/{}/libsonicdbcli.so type=link time=0 link=libsonicdbcli.so.0".format(multiarch),
         ] + DIST_LOOSE_COMMON_MTREE,
         target_compatible_with = ["@platforms//cpu:" + cpu],
         visibility = ["//visibility:public"],
@@ -105,6 +108,8 @@ sh_test(
     args = [
         "$(location :libswsscommon_pkg)",
         "$(location :libswsscommon_pkg.debug_symbols)",
+        "$(location :sonic-db-cli_pkg)",
+        "$(location :sonic-db-cli_pkg.debug_symbols)",
     ] + select({
         "//tools/bazel:yang_modules_enabled": ["enabled"],
         "//conditions:default": ["disabled"],
@@ -112,18 +117,16 @@ sh_test(
     data = [
         ":libswsscommon_pkg",
         ":libswsscommon_pkg.debug_symbols",
+        ":sonic-db-cli_pkg",
+        ":sonic-db-cli_pkg.debug_symbols",
     ],
 )
 
-tar(
+sonic_deploy_tar(
     name = "sonic-db-cli_pkg",
-    srcs = [
-        "//sonic-db-cli",
-    ],
-    default_mtime = "1672560000",
-    mtree = [
-        "usr/bin/sonic-db-cli type=file mode=0755 content=$(location //sonic-db-cli:sonic-db-cli)",
-    ],
+    out = "sonic-db-cli_pkg.tar",
+    binaries = {"usr/bin/sonic-db-cli type=file mode=0755": "//sonic-db-cli:sonic-db-cli"},
+    force_debug_build = True,
     visibility = ["//visibility:public"],
 )
 

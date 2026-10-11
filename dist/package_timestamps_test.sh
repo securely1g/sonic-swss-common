@@ -10,15 +10,15 @@ import tarfile
 with tarfile.open(sys.argv[1]) as archive:
     members = archive.getmembers()
     libraries = [member for member in members if re.fullmatch(
-        r"usr/lib/(?:x86_64|aarch64)-linux-gnu/libswsscommon\.so(?:\.0(?:\.0\.0)?)?",
+        r"usr/lib/(?:x86_64|aarch64)-linux-gnu/lib(?:swsscommon|sonicdbcli)\.so(?:\.0(?:\.0\.0)?)?",
         member.name,
     )]
     required = [archive.getmember(name) for name in (
         "usr/bin/swssloglevel",
         "var/run/redis/sonic-db/database_config.json",
     )]
-    if len(libraries) != 3:
-        raise SystemExit(f"Expected three library entries, found {len(libraries)}")
+    if len(libraries) != 6:
+        raise SystemExit(f"Expected six library entries, found {len(libraries)}")
     required.extend(libraries)
 
 with tarfile.open(sys.argv[2]) as archive:

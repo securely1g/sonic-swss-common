@@ -20,3 +20,44 @@ swss_cc_binary(
     visibility = ["//visibility:public"],
     deps = [":sonicdbcli"],
 )
+
+# Make installs this DSO as part of libswsscommon. Keep its public symbols
+# separate from Common itself, and link against the same runtime library.
+swss_cc_binary(
+    name = "libsonicdbcli.so.0",
+    srcs = [
+        "sonic-db-cli.cpp",
+        "sonic-db-cli.h",
+    ],
+    cxxopts = DBGFLAGS + CXXFLAGS_COMMON,
+    linkopts = [
+        "-Wl,-soname,libsonicdbcli.so.0",
+        "-Wl,-z,now",
+    ],
+    linkshared = True,
+    visibility = ["//visibility:public"],
+    deps = ["//:libswsscommon_shared"],
+)
+
+cc_import(
+    name = "sonicdbcli_so",
+    shared_library = ":libsonicdbcli.so.0",
+)
+
+swss_cc_library(
+    name = "sonicdbcli_shared",
+    hdrs = ["sonic-db-cli.h"],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":sonicdbcli_so",
+        "//:libswsscommon_shared",
+    ],
+)
+
+# Exercise a real consumer of the public DSO without requiring a Redis server.
+cc_test(
+    name = "shared_library_test",
+    srcs = ["shared_library_test.cpp"],
+    linkstatic = False,
+    deps = [":sonicdbcli_shared"],
+)
