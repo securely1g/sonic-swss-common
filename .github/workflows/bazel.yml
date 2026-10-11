@@ -99,6 +99,7 @@ jobs:
           //dist:libswsscommon_pkg
           //dist:libswsscommon_pkg.debug_symbols
           //dist:sonic-db-cli_pkg
+          //dist:sonic-db-cli_pkg.debug_symbols
           //pyext:swsscommon_pkg
           //goext:swsscommon
           //goext:swsscommon_runtime_test
@@ -108,6 +109,7 @@ jobs:
           //tests:interface_ut
           //tests:vrf_ut
           //tests:shared_library_runtime_test
+          //sonic-db-cli:shared_library_test
           //tests:defaultvalueprovider_ut
           //dist:libswsscommon_package_test
           //dist:package_timestamps_test
@@ -130,6 +132,7 @@ jobs:
             bazel-bin/dist/libswsscommon_pkg.tar \
             bazel-bin/dist/libswsscommon_pkg.debug_symbols.tar \
             bazel-bin/dist/sonic-db-cli_pkg.tar \
+            bazel-bin/dist/sonic-db-cli_pkg.debug_symbols.tar \
             bazel-bin/pyext/swsscommon_pkg.tar.gz \
             artifacts/yang/
 
@@ -156,6 +159,7 @@ jobs:
           //dist:libswsscommon_pkg
           //dist:libswsscommon_pkg.debug_symbols
           //dist:sonic-db-cli_pkg
+          //dist:sonic-db-cli_pkg.debug_symbols
           //pyext:swsscommon_pkg
           //goext:swsscommon
           //goext:swsscommon_runtime_test
@@ -165,6 +169,7 @@ jobs:
           //tests:interface_ut
           //tests:vrf_ut
           //tests:shared_library_runtime_test
+          //sonic-db-cli:shared_library_test
           //dist:libswsscommon_package_test
           //dist:package_timestamps_test
           //pyext:swsscommon_package_test
@@ -186,6 +191,7 @@ jobs:
             bazel-bin/dist/libswsscommon_pkg.tar \
             bazel-bin/dist/libswsscommon_pkg.debug_symbols.tar \
             bazel-bin/dist/sonic-db-cli_pkg.tar \
+            bazel-bin/dist/sonic-db-cli_pkg.debug_symbols.tar \
             bazel-bin/pyext/swsscommon_pkg.tar.gz \
             artifacts/no-yang/
 

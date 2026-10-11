@@ -52,15 +52,19 @@ def main():
         SWSS_RUNTIME_ROOT=str(runtime_root),
         SWSS_YANG_MODE=yang_mode,
     )
+    # Source-built extensions can carry DT_RPATH entries pointing at system
+    # directories; those precede LD_LIBRARY_PATH. Load the declared libraries
+    # by exact path so the import test cannot pass against host copies.
+    preload_names = ["libhiredis.so.1.1.0"]
     if yang_mode == "enabled":
-        # Bazel's source-built libyang introduces DT_RPATH entries, which take
-        # precedence over LD_LIBRARY_PATH. Load the exact extracted SONAME so
-        # the Go consumer exercises the deployed payload, keeping its loaded
-        # path assertion rather than falling back to a build-tree library.
-        libyang = {path.resolve() for path in runtime_root.rglob("libyang.so.3")}
-        if len(libyang) != 1:
-            raise AssertionError(f"Expected one staged libyang, found {sorted(libyang)}")
-        environment["LD_PRELOAD"] = str(libyang.pop())
+        preload_names.append("libyang.so.3")
+    preloads = []
+    for name in preload_names:
+        matches = {path.resolve() for path in runtime_root.rglob(name)}
+        if len(matches) != 1:
+            raise AssertionError(f"Expected one staged {name}, found {sorted(matches)}")
+        preloads.append(str(matches.pop()))
+    environment["LD_PRELOAD"] = ":".join(preloads)
     if expected_library != "-":
         environment["SWSS_EXPECTED_LIBRARY"] = str(Path(expected_library).resolve())
 

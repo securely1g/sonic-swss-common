@@ -110,6 +110,7 @@ targets=(
   //dist:libswsscommon_pkg
   //dist:libswsscommon_pkg.debug_symbols
   //dist:sonic-db-cli_pkg
+  //dist:sonic-db-cli_pkg.debug_symbols
   //pyext:swsscommon_pkg
   //goext:swsscommon
   //goext:swsscommon_runtime_test
@@ -119,6 +120,7 @@ targets=(
   //tests:interface_ut
   //tests:vrf_ut
   //tests:shared_library_runtime_test
+  //sonic-db-cli:shared_library_test
   //dist:libswsscommon_package_test
   //dist:package_timestamps_test
   //pyext:swsscommon_package_test
@@ -217,13 +219,14 @@ Serde test XML and logs, the Bazel module lockfile for each YANG mode, Common's
 source `Cargo.lock`, and the tested source commit and tree. The CodeQL job retains
 the Cargo and Bazel module locks.
 
-Every package download contains these four archives:
+Every package download contains these five archives:
 
-- `libswsscommon_pkg.tar`: C++ runtime library, `swssloglevel`, Lua files, and
+- `libswsscommon_pkg.tar`: `libswsscommon.so.0`, `libsonicdbcli.so.0`, `swssloglevel`, Lua files, and
   database configuration.
 - `libswsscommon_pkg.debug_symbols.tar`: detached debug information for the
-  runtime library and `swssloglevel` in `libswsscommon_pkg.tar`.
+  two runtime libraries and `swssloglevel` in `libswsscommon_pkg.tar`.
 - `sonic-db-cli_pkg.tar`: database CLI.
+- `sonic-db-cli_pkg.debug_symbols.tar`: detached symbols for the database CLI.
 - `swsscommon_pkg.tar.gz`: Python bindings.
 
 ### Dependency runtime packages
@@ -276,7 +279,8 @@ Build the runtime package and its matching detached symbols together:
 
 ```sh
 bazel build --//tools/bazel:yang_modules=True \
-  //dist:libswsscommon_pkg //dist:libswsscommon_pkg.debug_symbols
+  //dist:libswsscommon_pkg //dist:libswsscommon_pkg.debug_symbols \
+  //dist:sonic-db-cli_pkg //dist:sonic-db-cli_pkg.debug_symbols
 ```
 
 Use `--//tools/bazel:yang_modules=False` for disabled mode, and add
@@ -288,9 +292,10 @@ file from the same linked ELF. The runtime package has its DWARF sections remove
 the separate archive stores them under `/usr/lib/debug/.build-id/`.
 
 The package test validates the library filename, SONAME, symlinks, build IDs,
-debug-link checksums, and GDB source-line lookup. It checks both the library and
-`swssloglevel` for detached debug information. The symbol archive covers these
-two files; the CLI and Python package archives have their own packaging paths.
+debug-link checksums, and GDB source-line lookup. It checks both shared libraries,
+`swssloglevel` and `sonic-db-cli` for detached debug information. A separate C++
+consumer links to the public CLI library and runs its help path without Redis.
+The Python package archive has its own packaging path.
 
 The direct targets `//:libswsscommon`, `//:libswsscommon_shared`, and
 `//:libswsscommon_consolidated.so` continue to use the caller's compilation

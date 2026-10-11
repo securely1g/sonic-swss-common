@@ -3,7 +3,9 @@ set -euo pipefail
 
 package_archive="$1"
 symbols_archive="$2"
-yang_mode="$3"
+cli_archive="$3"
+cli_symbols_archive="$4"
+yang_mode="$5"
 package_root="${TEST_TMPDIR}/libswsscommon-package"
 symbols_root="${TEST_TMPDIR}/libswsscommon-symbols"
 
@@ -78,10 +80,14 @@ PY
     echo "Validated $(basename "${runtime_file}") build ID ${build_id}"
 }
 
+assert_equal "CLI runtime archive filename" "sonic-db-cli_pkg.tar" "$(basename "${cli_archive}")"
+
 soname="libswsscommon.so.0"
 mkdir -p "${package_root}" "${symbols_root}"
 tar --extract --file="${package_archive}" --directory="${package_root}"
 tar --extract --file="${symbols_archive}" --directory="${symbols_root}"
+tar --extract --file="${cli_archive}" --directory="${package_root}"
+tar --extract --file="${cli_symbols_archive}" --directory="${symbols_root}"
 
 if [[ -e "${package_root}/usr/lib/debug" ]]; then
     echo "Runtime package contains detached debug files" >&2
@@ -121,6 +127,33 @@ assert_equal "swssloglevel mode" "755" "$(stat --format=%a "${package_root}/usr/
 
 validate_debug_pair "${resolved_library}"
 validate_debug_pair "${package_root}/usr/bin/swssloglevel"
+validate_debug_pair "${package_root}/usr/bin/sonic-db-cli"
+
+cli_library="${library_dir}/libsonicdbcli.so.0.0.0"
+assert_equal "CLI library SONAME" "libsonicdbcli.so.0" "$(soname_from "${cli_library}")"
+assert_equal "CLI library mode" "555" "$(stat --format=%a "${cli_library}")"
+assert_equal "CLI SONAME symlink" "libsonicdbcli.so.0.0.0" "$(readlink "${library_dir}/libsonicdbcli.so.0")"
+assert_equal "CLI development symlink" "libsonicdbcli.so.0" "$(readlink "${library_dir}/libsonicdbcli.so")"
+cli_dynamic_entries="$(LC_ALL=C readelf --dynamic "${cli_library}")"
+if [[ "${cli_dynamic_entries}" != *"Shared library: [libswsscommon.so.0]"* ]]; then
+    echo "libsonicdbcli does not link to the shared Common runtime" >&2
+    exit 1
+fi
+validate_debug_pair "${cli_library}"
+
+# The first instruction of printUsage can map to an inlined ostream header.
+# Query the command entry point to verify a line in the CLI source itself.
+cli_gdb_output="${TEST_TMPDIR}/libsonicdbcli-gdb.txt"
+gdb --batch --nx --quiet \
+    -ex "set debuginfod enabled off" \
+    -ex "set debug-file-directory ${symbols_root}/usr/lib/debug" \
+    -ex "file ${cli_library}" \
+    -ex "info line sonic_db_cli" > "${cli_gdb_output}" 2>&1
+if ! grep -Eq 'Line [0-9]+ of ".*sonic-db-cli/sonic-db-cli\.cpp"' "${cli_gdb_output}"; then
+    cat "${cli_gdb_output}" >&2
+    echo "GDB did not resolve the CLI library's source line" >&2
+    exit 1
+fi
 
 gdb_output="${TEST_TMPDIR}/libswsscommon-gdb.txt"
 gdb --batch --nx --quiet \
