@@ -85,7 +85,6 @@ jobs:
           --//tools/bazel:yang_modules=True
           --test_output=errors
           --verbose_failures
-          --sandbox_debug
           //common:cfg_schema_generated
           //:libswsscommon
           //:libswsscommon_shared
@@ -148,7 +147,6 @@ jobs:
           --//tools/bazel:yang_modules=False
           --test_output=errors
           --verbose_failures
-          --sandbox_debug
           //:libswsscommon
           //:libswsscommon_shared
           //:libswsscommon_consolidated.so
