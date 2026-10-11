@@ -101,6 +101,7 @@ jobs:
           //dist:sonic-db-cli_pkg
           //dist:sonic-db-cli_pkg.debug_symbols
           //pyext:swsscommon_pkg
+          //pyext:swsscommon_pkg.debug_symbols
           //goext:swsscommon
           //goext:swsscommon_runtime_test
           //tests:status_code_util_test
@@ -134,6 +135,7 @@ jobs:
             bazel-bin/dist/sonic-db-cli_pkg.tar \
             bazel-bin/dist/sonic-db-cli_pkg.debug_symbols.tar \
             bazel-bin/pyext/swsscommon_pkg.tar.gz \
+            bazel-bin/pyext/swsscommon_pkg.debug_symbols.tar \
             artifacts/yang/
 
       - name: Build and test without YANG
@@ -161,6 +163,7 @@ jobs:
           //dist:sonic-db-cli_pkg
           //dist:sonic-db-cli_pkg.debug_symbols
           //pyext:swsscommon_pkg
+          //pyext:swsscommon_pkg.debug_symbols
           //goext:swsscommon
           //goext:swsscommon_runtime_test
           //tests:status_code_util_test
@@ -193,6 +196,7 @@ jobs:
             bazel-bin/dist/sonic-db-cli_pkg.tar \
             bazel-bin/dist/sonic-db-cli_pkg.debug_symbols.tar \
             bazel-bin/pyext/swsscommon_pkg.tar.gz \
+            bazel-bin/pyext/swsscommon_pkg.debug_symbols.tar \
             artifacts/no-yang/
 
       - name: Upload YANG package artifacts
