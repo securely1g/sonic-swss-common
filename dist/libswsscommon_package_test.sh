@@ -141,12 +141,14 @@ if [[ "${cli_dynamic_entries}" != *"Shared library: [libswsscommon.so.0]"* ]]; t
 fi
 validate_debug_pair "${cli_library}"
 
+# The first instruction of printUsage can map to an inlined ostream header.
+# Query the command entry point to verify a line in the CLI source itself.
 cli_gdb_output="${TEST_TMPDIR}/libsonicdbcli-gdb.txt"
 gdb --batch --nx --quiet \
     -ex "set debuginfod enabled off" \
     -ex "set debug-file-directory ${symbols_root}/usr/lib/debug" \
     -ex "file ${cli_library}" \
-    -ex "info line printUsage" > "${cli_gdb_output}" 2>&1
+    -ex "info line sonic_db_cli" > "${cli_gdb_output}" 2>&1
 if ! grep -Eq 'Line [0-9]+ of ".*sonic-db-cli/sonic-db-cli\.cpp"' "${cli_gdb_output}"; then
     cat "${cli_gdb_output}" >&2
     echo "GDB did not resolve the CLI library's source line" >&2
