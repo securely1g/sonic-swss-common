@@ -10,7 +10,7 @@ on:
   pull_request:
   workflow_dispatch:
 
-# Draft validation for Infrastructure #44 / Registry #71. Remove after landing.
+# Draft validation for Registry #71. Remove after the registry entry lands.
 env:
   SONIC_BAZEL_REGISTRY_URL: https://raw.githubusercontent.com/securely1g/sonic-bazel-registry/codex/swig-defines-registry
 
