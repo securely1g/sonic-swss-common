@@ -6,7 +6,6 @@ load("@bazel_skylib//rules:write_file.bzl", "write_file")
 load("@sonic_build_infra//python:py_native_library.bzl", "py_native_library")
 load("@sonic_build_infra//swig:defs.bzl", "swig_gen", "swig_lib_deb")
 load("@sonic_build_infra//tar:sonic_deploy_tar.bzl", "sonic_deploy_tar")
-load("//tools/bazel:swig.bzl", "swig_interface")
 
 # Extract SWIG library files from apt package for hermetic builds
 swig_lib_deb(
@@ -17,26 +16,15 @@ swig_lib_deb(
 
 exports_files(["swsscommon.i"])
 
-# Pass the feature define through a declared interface adapter. The source
-# interface is also a header input to the SWIG action below.
-swig_interface(
-    name = "swsscommon_bazel_interface",
-    out = "swsscommon_bazel.i",
+swig_gen(
+    name = "swsscommon_pyy",
+    hdrs = ["//:hdrs"],
+    cpp_out = "py3/swsscommon_wrap.cpp",
     defines = select({
         "//tools/bazel:yang_modules_enabled": ["ENABLE_YANG_MODULES"],
         "//conditions:default": [],
     }),
     interface = "swsscommon.i",
-)
-
-swig_gen(
-    name = "swsscommon_pyy",
-    hdrs = [
-        "swsscommon.i",
-        "//:hdrs",
-    ],
-    cpp_out = "py3/swsscommon_wrap.cpp",
-    interface = ":swsscommon_bazel_interface",
     python_out = "py3/swsscommon.py",
     swig_lib = ":swig_lib",
 )
