@@ -146,7 +146,7 @@ def main():
         go_inputs.mkdir(parents=True, exist_ok=True)
         (go_inputs / "build-output-base.txt").write_text(output_base + "\n")
     else:
-        # The workflow restores the tracing environment after analysis.
+        # The workflow restores the tracing environment after database finalization.
         # Start a new Bazel server only after that boundary. The YANG source
         # archive/database has already been finalized and bundled at this point.
         if any(os.environ.get(key) for key in (

@@ -50,6 +50,8 @@ jobs:
       image: debian:trixie-20260918
       options: --init
     timeout-minutes: 90
+    outputs:
+      native-result: ${{ steps.native-validation.outcome }}
     permissions:
       actions: read
       contents: read
@@ -111,15 +113,19 @@ jobs:
     - name: Build YANG under CodeQL and reuse outputs for tests and packages
       run: python3 .github/scripts/codeql_build_once.py yang
 
-    - name: Perform CodeQL Analysis
-      id: analyze
+    # Freeze the YANG database and source archive before no-YANG can replace
+    # generated files. Run security queries only after native validation.
+    - name: Finalize the YANG CodeQL database
+      id: finalize
       uses: github/codeql-action/analyze@ec3cf9c605b848da5f1e41e8452719eb1ccfb9a6 # v2.1.29
       with:
-        category: "/language:cpp"
+        skip-queries: true
+        cleanup-level: none
+        upload: false
 
     - name: Restore the environment before running further build steps
       env:
-        CODEQL_DATABASES: ${{ steps.analyze.outputs.db-locations }}
+        CODEQL_DATABASES: ${{ steps.finalize.outputs.db-locations }}
       run: |
         python3 - <<'PY'
         import json
@@ -144,7 +150,7 @@ jobs:
       shell: bash
       env:
         CODEQL: ${{ steps.init.outputs.codeql-path }}
-        CODEQL_DATABASES: ${{ steps.analyze.outputs.db-locations }}
+        CODEQL_DATABASES: ${{ steps.finalize.outputs.db-locations }}
       run: |
         codeql_database="$(python3 -c 'import json, os; print(json.loads(os.environ["CODEQL_DATABASES"])["cpp"])')"
         "$CODEQL" pack install .github/codeql/coverage
@@ -245,8 +251,22 @@ jobs:
         path: artifacts/codeql-go-inputs/
         if-no-files-found: error
 
+    # Default success() requires both native modes and all evidence/package
+    # uploads above to finish. Security-query or upload failures below remain
+    # visible on Analyze (cpp), without changing this completed native result.
+    - name: Record completed native validation
+      id: native-validation
+      run: echo "Both native configurations and their artifacts passed."
+
+    - name: Perform CodeQL Analysis
+      id: analyze
+      if: ${{ !cancelled() && steps.finalize.outcome == 'success' }}
+      uses: github/codeql-action/analyze@ec3cf9c605b848da5f1e41e8452719eb1ccfb9a6 # v2.1.29
+      with:
+        category: "/language:cpp"
+
   # Preserve the existing required check while doing the AMD64 work once.
-  # A failed, cancelled or skipped combined job must fail this gate.
+  # Missing, failed or skipped native validation cannot pass this gate.
   build-amd64:
     name: Bazel (AMD64)
     needs: analyze-cpp
@@ -254,7 +274,7 @@ jobs:
     runs-on: ubuntu-24.04
     permissions: {}
     steps:
-      - name: Require the combined build, tests, packages and analysis to pass
+      - name: Require native builds, tests, packages and artifacts to pass
         env:
-          RESULT: ${{ needs.analyze-cpp.result }}
+          RESULT: ${{ needs.analyze-cpp.outputs.native-result }}
         run: test "$RESULT" = success

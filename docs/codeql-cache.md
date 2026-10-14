@@ -22,12 +22,21 @@ versions.
 The job creates a fresh Bazel output base after CodeQL initialization. This starts
 a new Bazel server with the tracing environment and avoids existing local action
 state. The local action cache starts empty and is populated only by this traced
-job. YANG tests reuse those outputs. The job finalizes analysis and bundles its
-source archive before switching to no-YANG, whose generated files can otherwise
-overwrite paths used for YANG analysis. After analysis, the workflow restores the
-job environment from CodeQL's tracing-environment records and starts a new Bazel
-server. It then builds and tests no-YANG using the same
-private output base. The original YANG-only analysis scope is preserved.
+job. YANG tests reuse those outputs. The job finalizes the YANG database and
+bundles its source archive before switching to no-YANG, whose generated files
+can otherwise overwrite paths used for YANG analysis. After database finalization,
+the workflow restores the job environment from CodeQL's tracing-environment
+records and starts a new Bazel server. It then builds and tests no-YANG using the
+same private output base. The original YANG-only analysis scope is preserved.
+Security queries run against that finalized database after the native steps,
+including when a later native step fails.
+
+The required `Bazel (AMD64)` check uses the completed native-validation result;
+query or SARIF-upload failures remain visible on the informational `Analyze (cpp)`
+check. If initialization, finalization or an earlier step prevents native evidence
+from completing, the required check still fails. The aggregate still waits for
+the shared job to finish, so pending analysis can delay its result.
+
 The build uses these controls:
 
 | Control | Purpose |

@@ -384,15 +384,18 @@ this second phase, and every required test must execute and pass. Matching
 runtime/debug archives are copied before changing feature configuration.
 Distinct YANG, debug and linkage configurations still require distinct outputs.
 
-Analysis and its source archive are finalized before switching to no-YANG:
+The YANG database and its source archive are finalized before switching to no-YANG:
 generated files can share output paths across feature configurations. The
 no-YANG build and tests then run without tracing, preserving the previous
 YANG-only analysis scope and reusing common outputs from the private build.
 
 The `sonic-swss-common-codeql-cpp` artifact retains build profiles, execution
 logs, generated module resolution, package hashes and source-extraction evidence.
-The existing `Bazel (AMD64)` check requires the combined build/test/analysis job
-to succeed; a failed, cancelled or skipped job cannot satisfy it.
+The existing `Bazel (AMD64)` check requires both native modes and their artifact
+uploads to finish successfully. Missing, failed or skipped native validation
+cannot satisfy it. Security queries then use the finalized YANG database; their
+failures remain visible on the informational `Analyze (cpp)` check. The scan also
+runs after a later native failure when the YANG database was finalized.
 
 ## SWIG constant wrapping
 
