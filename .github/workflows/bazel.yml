@@ -75,7 +75,12 @@ jobs:
       - name: Check Bazel formatting
         run: bazel run ${{ matrix.bazel_args }} //tools/bazel/buildifier:buildifier.format.check
 
+      - name: Record disk usage before YANG build
+        continue-on-error: true
+        run: bash tools/bazel/record_disk_usage.sh before-yang
+
       - name: Build and test with YANG
+        id: yang_build
         run: >-
           bazel test
           ${{ matrix.bazel_args }}
@@ -101,6 +106,7 @@ jobs:
           //dist:sonic-db-cli_pkg
           //dist:sonic-db-cli_pkg.debug_symbols
           //pyext:swsscommon_pkg
+          //pyext:swsscommon_pkg.debug_symbols
           //goext:swsscommon
           //goext:swsscommon_runtime_test
           //tests:status_code_util_test
@@ -114,6 +120,11 @@ jobs:
           //dist:libswsscommon_package_test
           //dist:package_timestamps_test
           //pyext:swsscommon_package_test
+
+      - name: Record disk usage after YANG build
+        if: ${{ always() && (steps.yang_build.outcome == 'success' || steps.yang_build.outcome == 'failure') }}
+        continue-on-error: true
+        run: bash tools/bazel/record_disk_usage.sh after-yang
 
       - name: Collect YANG package artifacts
         run: |
@@ -134,9 +145,15 @@ jobs:
             bazel-bin/dist/sonic-db-cli_pkg.tar \
             bazel-bin/dist/sonic-db-cli_pkg.debug_symbols.tar \
             bazel-bin/pyext/swsscommon_pkg.tar.gz \
+            bazel-bin/pyext/swsscommon_pkg.debug_symbols.tar \
             artifacts/yang/
 
+      - name: Record disk usage before no-YANG build
+        continue-on-error: true
+        run: bash tools/bazel/record_disk_usage.sh before-no-yang
+
       - name: Build and test without YANG
+        id: no_yang_build
         run: >-
           bazel test
           ${{ matrix.bazel_args }}
@@ -161,6 +178,7 @@ jobs:
           //dist:sonic-db-cli_pkg
           //dist:sonic-db-cli_pkg.debug_symbols
           //pyext:swsscommon_pkg
+          //pyext:swsscommon_pkg.debug_symbols
           //goext:swsscommon
           //goext:swsscommon_runtime_test
           //tests:status_code_util_test
@@ -173,6 +191,11 @@ jobs:
           //dist:libswsscommon_package_test
           //dist:package_timestamps_test
           //pyext:swsscommon_package_test
+
+      - name: Record disk usage after no-YANG build
+        if: ${{ always() && (steps.no_yang_build.outcome == 'success' || steps.no_yang_build.outcome == 'failure') }}
+        continue-on-error: true
+        run: bash tools/bazel/record_disk_usage.sh after-no-yang
 
       - name: Collect no-YANG package artifacts
         run: |
@@ -193,6 +216,7 @@ jobs:
             bazel-bin/dist/sonic-db-cli_pkg.tar \
             bazel-bin/dist/sonic-db-cli_pkg.debug_symbols.tar \
             bazel-bin/pyext/swsscommon_pkg.tar.gz \
+            bazel-bin/pyext/swsscommon_pkg.debug_symbols.tar \
             artifacts/no-yang/
 
       - name: Upload YANG package artifacts

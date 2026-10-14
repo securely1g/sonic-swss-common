@@ -7,6 +7,7 @@ import json
 import os
 from pathlib import Path
 import re
+import shlex
 import shutil
 import subprocess
 
@@ -61,8 +62,23 @@ def record(artifacts):
     if expected_revision is not None and expected_revision != revision[0]:
         raise ValueError("The registry branch differs from the revision selected for this validation")
     (artifacts / "declared.bazelrc").write_text(configuration)
-    if registry == MAIN:
-        (artifacts / "effective.bazelrc").write_text(configuration)
+    effective = artifacts.resolve() / "effective.bazelrc"
+    effective.write_text(configuration.replace(MAIN, registry))
+    if registry != MAIN and os.environ.get("GITHUB_PATH"):
+        # Draft CI replaces the workspace registry instead of appending another
+        # --registry option. Keep the tracked main declaration unchanged.
+        binary = shutil.which("bazel")
+        if not binary:
+            raise ValueError("Bazel must be installed before selecting Draft inputs")
+        commands = artifacts.resolve() / "draft-bin"
+        commands.mkdir(exist_ok=True)
+        wrapper = commands / "bazel"
+        wrapper.write_text("#!/bin/sh\nexec " + shlex.quote(binary) +
+                           " --noworkspace_rc --bazelrc=" + shlex.quote(str(effective)) +
+                           ' "$@"\n')
+        wrapper.chmod(0o755)
+        with open(os.environ["GITHUB_PATH"], "a") as path_file:
+            path_file.write(str(commands) + "\n")
     write_json(artifacts / "registry-inputs.json", {
         "declared_registry": MAIN,
         "registry": registry, "observed_revision": revision[0],
