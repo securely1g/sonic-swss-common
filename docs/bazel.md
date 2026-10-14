@@ -214,11 +214,20 @@ artifact for your architecture and feature mode from the **Artifacts** section:
 - `sonic-swss-common-no-yang-AMD64`
 - `sonic-swss-common-no-yang-ARM64`
 
-The separate `sonic-swss-common-rust-AMD64` and
-`sonic-swss-common-rust-ARM64` artifacts retain the Rust unit-test and shared
-Serde test XML and logs, the Bazel module lockfile for each YANG mode, Common's
-source `Cargo.lock`, and the tested source commit and tree. The CodeQL job retains
-the Cargo and Bazel module locks.
+YANG-enabled and YANG-disabled validation run in separate native jobs for each
+architecture. Each job retains `--sandbox_debug` and its disk-usage snapshots;
+its sandboxes do not accumulate with the other feature mode. The `Bazel (AMD64)`
+and `Bazel (ARM64)` checks each require both feature jobs for that architecture
+to succeed.
+
+The `sonic-swss-common-rust-<architecture>-<mode>` artifacts retain the Rust
+unit-test and shared Serde test XML and logs, the Bazel module lockfile for that
+mode, Common's source `Cargo.lock`, and the tested source commit and tree.
+`<architecture>` is `AMD64` or `ARM64`, and `<mode>` is `enabled` or `disabled`.
+The corresponding `sonic-swss-common-go-validation-<architecture>-<mode>`
+artifacts retain native Go and registry evidence. Each includes a
+`feature-mode.txt` receipt. Package artifact names above remain unchanged.
+The CodeQL job retains the Cargo and Bazel module locks.
 
 Every package download contains these six archives:
 
