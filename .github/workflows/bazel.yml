@@ -9,10 +9,6 @@ on:
 permissions:
   contents: read
 
-# Draft validation for Registry #71. Remove after the registry entry lands.
-env:
-  SONIC_BAZEL_REGISTRY_URL: https://raw.githubusercontent.com/securely1g/sonic-bazel-registry/codex/swig-defines-registry
-
 jobs:
   build-and-test:
     name: Bazel (${{ matrix.arch }})
