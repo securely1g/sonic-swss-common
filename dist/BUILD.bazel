@@ -101,8 +101,8 @@ genrule(
     name = "libswsscommon_symbols",
     srcs = [
         ":libswsscommon_pkg",
-        "//:debian/changelog",
-        "//:debian/control",
+        "//debian:changelog",
+        "//debian:control",
     ],
     outs = ["libswsscommon.symbols"],
     cmd = select({
@@ -116,8 +116,8 @@ output="$$execroot/$@"
 work="$$(mktemp -d)"
 trap 'rm -rf "$$work"' EXIT
 mkdir -p "$$work/debian" "$$work/package/DEBIAN"
-cp "$(location //:debian/control)" "$$work/debian/control"
-cp "$(location //:debian/changelog)" "$$work/debian/changelog"
+cp "$(location //debian:control)" "$$work/debian/control"
+cp "$(location //debian:changelog)" "$$work/debian/changelog"
 "$(BSDTAR_BIN)" -xf "$(location :libswsscommon_pkg)" -C "$$work/package"
 cd "$$work"
 "$$metadata_tool" -a"$$debian_arch" -plibswsscommon -P"$$work/package" \
@@ -185,4 +185,9 @@ sh_test(
         ":libswsscommon_pkg",
         ":sonic-db-cli_pkg",
     ],
+)
+
+alias(
+    name = "libswsscommon_deb",
+    actual = "//debian:libswsscommon_deb",
 )
