@@ -1,0 +1,80 @@
+load("@rules_python//python:defs.bzl", "py_binary")
+load("@sonic_build_infra//deb:metadata.bzl", "debian_library")
+load(":packages.bzl", "common_debian_package")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files([
+    "control",
+    "changelog",
+])
+
+filegroup(
+    name = "source_metadata",
+    srcs = [
+        "changelog",
+        "compat",
+        "conffiles",
+        "control",
+    ] + glob([
+        "*.install",
+        "*.dirs",
+    ]),
+)
+
+py_binary(
+    name = "stage",
+    srcs = ["stage.py"],
+)
+
+_FOREIGN_LIBRARIES = [
+    "libboost-serialization1.83.0",
+    "libc6",
+    "libgcc-s1",
+    "libhiredis1.1.0",
+    "libpython3.13",
+    "libstdc++6",
+    "libuuid1",
+    "libzmq5",
+]
+
+[
+    debian_library(
+        name = package_name + "_metadata",
+        control_tar = "@common_package_deps//" + package_name + ":control",
+        data = "@common_package_deps//" + package_name + ":data",
+    )
+    for package_name in _FOREIGN_LIBRARIES
+]
+
+_LIBRARY_DEPENDENCIES = [":" + name + "_metadata" for name in _FOREIGN_LIBRARIES] + [
+    "@libnl3//:libnl_3_debian_metadata",
+    "@libnl3//:libnl_route_3_debian_metadata",
+    "@libnl3//:libnl_genl_3_debian_metadata",
+    "@libnl3//:libnl_nf_3_debian_metadata",
+] + select({
+    "//tools/bazel:yang_modules_enabled": ["@libyang//:libyang3_debian_metadata"],
+    "//conditions:default": [],
+})
+
+common_debian_package(
+    name = "libswsscommon",
+    package_name = "libswsscommon",
+    dependencies = _LIBRARY_DEPENDENCIES,
+    library = True,
+    runtime = "//dist:libswsscommon_pkg",
+)
+
+common_debian_package(
+    name = "python3_swsscommon",
+    package_name = "python3-swsscommon",
+    dependencies = _LIBRARY_DEPENDENCIES + [":libswsscommon_metadata"],
+    runtime = "//pyext:swsscommon_pkg",
+)
+
+common_debian_package(
+    name = "sonic_db_cli",
+    package_name = "sonic-db-cli",
+    dependencies = _LIBRARY_DEPENDENCIES + [":libswsscommon_metadata"],
+    runtime = "//dist:sonic-db-cli_pkg",
+)
