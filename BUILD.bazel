@@ -19,6 +19,8 @@ exports_files([
     "Cargo.lock",
     "Cargo.toml",
     "LICENSE",
+    "debian/changelog",
+    "debian/control",
     "gen_cfg_schema.py",
 ])
 

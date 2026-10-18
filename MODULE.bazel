@@ -33,6 +33,15 @@ bazel_dep(name = "libyang", version = "3.12.2.sonic.1")
 # SONiC nexthop patch; the older registration points at a retired mirror.
 bazel_dep(name = "libnl3", version = "3.7.0-sonic.2")
 bazel_dep(name = "sonic-build-infra", version = "0.0.16-07a777db629f29ef17c2e65ee30455e2df13fe93", repo_name = "sonic_build_infra")
+
+# Draft integration of the declared Debian metadata tools. Replace this
+# override with their merged registry release before making this PR ready.
+git_override(
+    module_name = "sonic-build-infra",
+    commit = "4a1a3287ee859352fe04dd63df3838d5fe00f3a5",
+    remote = "https://github.com/securely1g/sonic-build-infra.git",
+)
+
 bazel_dep(name = "sonic-yang-mgmt", version = "1.0.0-9ab452d22773c41783092ae3bd6c206d6c257c8d", repo_name = "sonic_yang_mgmt")
 bazel_dep(name = "sonic-yang-models", version = "1.0.0-9ab452d22773c41783092ae3bd6c206d6c257c8d", repo_name = "sonic_yang_models")
 
@@ -107,3 +116,7 @@ register_toolchains(
 # The actual dependencies are listed in sonic-build-infra, and re-exported.
 apt = use_extension("@rules_distroless//apt:extensions.bzl", "apt")
 use_repo(apt, "trixie")
+
+# Reuse tar.bzl's declared executable when staging the existing runtime TAR.
+tar_toolchains = use_extension("@tar.bzl//tar:extensions.bzl", "toolchains")
+use_repo(tar_toolchains, "bsd_tar_toolchains")

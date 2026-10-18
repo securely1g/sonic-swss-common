@@ -390,3 +390,27 @@ API and verifies build IDs, debug-link checksums and GDB source lookup.
 
 The installed archive uses ordinary Python imports; it does not contain the
 Bazel runfiles loader. Bazel Python consumers still use `//pyext:swsscommon`.
+### Debian library dependency metadata
+
+`//dist:libswsscommon_symbols` exports Debian symbols metadata for the exact
+libraries in `//dist:libswsscommon_pkg`. A consumer such as the Rust supervisor
+listener passes this file to `dpkg-shlibdeps`, together with the source-built
+Common library, to derive its `libswsscommon` package dependency. Copying a
+runtime TAR into a directory does not provide that package/version information.
+This metadata lists exported library functions and their package versions.
+Debuggers continue to use the separate `.debug_symbols` archives described above.
+
+The target reuses tar.bzl to stage the runtime and the declared
+`dpkg-gensymbols` tool to inspect the shared libraries. The version comes from
+Common's original `debian/changelog`; package information comes from
+`debian/control`. It generates the metadata for the selected architecture and
+YANG build variant, and does not create a DEB archive. Native YANG/no-YANG CI
+builds the target alongside the runtime package.
+
+```sh
+bazel build --//tools/bazel:yang_modules=False //dist:libswsscommon_symbols
+```
+
+The temporary infrastructure override is a draft dependency on
+[sonic-build-infra #46](https://github.com/securely1g/sonic-build-infra/pull/46).
+Replace it with the merged registry release before marking the change ready.

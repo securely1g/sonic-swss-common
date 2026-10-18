@@ -95,6 +95,50 @@ flatten(
     visibility = ["//visibility:public"],
 )
 
+# Library consumers use this metadata with dpkg-shlibdeps. Generate it from
+# the exact packaged libraries and the source owner's Debian version policy.
+genrule(
+    name = "libswsscommon_symbols",
+    srcs = [
+        ":libswsscommon_pkg",
+        "//:debian/changelog",
+        "//:debian/control",
+    ],
+    outs = ["libswsscommon.symbols"],
+    cmd = select({
+        "@platforms//cpu:x86_64": "debian_arch=amd64\n",
+        "@platforms//cpu:aarch64": "debian_arch=arm64\n",
+    }) + """
+set -eu
+execroot="$$PWD"
+metadata_tool="$$execroot/$(execpath @sonic_build_infra//tools/build_tools:dpkg-gensymbols)"
+output="$$execroot/$@"
+work="$$(mktemp -d)"
+trap 'rm -rf "$$work"' EXIT
+mkdir -p "$$work/debian" "$$work/package/DEBIAN"
+cp "$(location //:debian/control)" "$$work/debian/control"
+cp "$(location //:debian/changelog)" "$$work/debian/changelog"
+"$(BSDTAR_BIN)" -xf "$(location :libswsscommon_pkg)" -C "$$work/package"
+cd "$$work"
+"$$metadata_tool" -a"$$debian_arch" -plibswsscommon -P"$$work/package" \
+    -e"$$work/package/usr/lib/*/libswsscommon.so.0.0.0" \
+    -e"$$work/package/usr/lib/*/libsonicdbcli.so.0.0.0" \
+    -O"$$output"
+test -s "$$output"
+common_found=0
+dbcli_found=0
+while IFS= read -r line; do
+    case "$$line" in
+        'libswsscommon.so.0 libswsscommon #MINVER#') common_found=1 ;;
+        'libsonicdbcli.so.0 libswsscommon #MINVER#') dbcli_found=1 ;;
+    esac
+done < "$$output"
+test "$$common_found" = 1 && test "$$dbcli_found" = 1
+""",
+    toolchains = ["@bsd_tar_toolchains//:resolved_toolchain"],
+    tools = ["@sonic_build_infra//tools/build_tools:dpkg-gensymbols"],
+)
+
 copy_file(
     name = "libswsscommon_pkg.debug_symbols",
     src = ":dist_loose.debug_symbols",
