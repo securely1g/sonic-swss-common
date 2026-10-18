@@ -13,6 +13,11 @@ selects files from the existing source-built runtime TARs. For example, the
 runtime `libswsscommon` package includes `libswsscommon.so.0`, while the unversioned
 `libswsscommon.so` development link remains outside that package.
 
+The original `dh_fixperms` helper applies Debian's normal file permissions.
+For example, a checkout's group-writable `database_config.json` becomes mode
+`0644`, while executables and directories use `0755`. It runs in Debian's
+supported rootless mode; the archive rule assigns root ownership.
+
 `dh_makeshlibs` generates the library registration and `ldconfig` trigger, and
 `dh_installdeb` records the original database configuration file as a conffile.
 The shared metadata rule computes dependencies from the actual ELF files and
@@ -51,7 +56,7 @@ with the same version. It does not claim a transition between two different
 release versions. A later versioned release needs its own upgrade baseline.
 
 While the producer prerequisites are Draft, CI selects the reviewed
-`codex/common-debian-package-dependencies` registry branch and records its exact
+`codex/source-debian-runtime-permissions` registry branch and records its exact
 revision. The normal `.bazelrc` continues to use registry `main`. Before making
 this PR ready, replace the temporary CI registry selection with main and restore
 the pull-request branch filter to master.

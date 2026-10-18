@@ -10,8 +10,8 @@ on:
 # Temporary reviewed registry branch while producer prerequisites are Draft.
 # Keep .bazelrc on main; remove this selection once registry #73–75 merge.
 env:
-  SONIC_BAZEL_REGISTRY_URL: https://raw.githubusercontent.com/securely1g/sonic-bazel-registry/codex/common-debian-package-dependencies
-  SONIC_BAZEL_REGISTRY_REVISION: 3731527306262363533163e95776c352e5b69923
+  SONIC_BAZEL_REGISTRY_URL: https://raw.githubusercontent.com/securely1g/sonic-bazel-registry/codex/source-debian-runtime-permissions
+  SONIC_BAZEL_REGISTRY_REVISION: 7f8a0fd08ceb36cfaca9645a24e7f1dd174e0302
 
 permissions:
   contents: read

@@ -32,6 +32,9 @@ if dpkg-query -L libswsscommon | grep -E '/lib[^/]*\.so$'; then
     exit 1
 fi
 configuration=/var/run/redis/sonic-db/database_config.json
+test "$(stat -c %a "$configuration")" = 644
+test "$(stat -c %a /usr/share/doc/libswsscommon/changelog.gz)" = 644
+test "$(stat -c %a /usr/bin/sonic-db-cli)" = 755
 dpkg-query -W -f='${Conffiles}' libswsscommon | grep -F "$configuration"
 dpkg-query -S "$configuration"
 # Preserve a valid local administrator edit across a same-version reinstall.
@@ -58,4 +61,4 @@ if ldconfig -p | grep -F libswsscommon.so.0; then
 fi
 test -z "$(dpkg --audit)"
 apt-get check
-printf '%s\n' '{"initial_configuration":"passed","python_import":"passed","cli":"passed","reinstall":"passed","conffile_preservation":"passed","remove":"passed","purge":"passed","version_upgrade":"not tested: the existing source package version is 1.0.0"}' > "$package_directory/installation.json"
+printf '%s\n' '{"initial_configuration":"passed","installed_file_modes":"passed","python_import":"passed","cli":"passed","reinstall":"passed","conffile_preservation":"passed","remove":"passed","purge":"passed","version_upgrade":"not tested: the existing source package version is 1.0.0"}' > "$package_directory/installation.json"

@@ -11,14 +11,14 @@ import tempfile
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    for name in ['data', 'source', 'tar', 'install', 'installdeb', 'output_data', 'output_substvars', 'receipt']:
+    for name in ['data', 'source', 'tar', 'install', 'fixperms', 'installdeb', 'output_data', 'output_substvars', 'receipt']:
         parser.add_argument('--' + name.replace('_', '-'), type=Path, required=True)
     parser.add_argument('--makeshlibs', type=Path)
     parser.add_argument('--package', required=True)
     parser.add_argument('--architecture', required=True)
     parser.add_argument('--control-output', action='append', default=[])
     args = parser.parse_args()
-    paths = {name: getattr(args, name).absolute() for name in ['data', 'source', 'tar', 'install', 'installdeb', 'output_data', 'output_substvars', 'receipt']}
+    paths = {name: getattr(args, name).absolute() for name in ['data', 'source', 'tar', 'install', 'fixperms', 'installdeb', 'output_data', 'output_substvars', 'receipt']}
     controls = {name: Path(value).absolute() for name, value in (item.split('=', 1) for item in args.control_output)}
     makeshlibs = args.makeshlibs.absolute() if args.makeshlibs else None
     env = dict(os.environ, DEB_HOST_ARCH=args.architecture, LANG='C', LC_ALL='C')
@@ -38,6 +38,10 @@ def main():
         doc = package / 'usr/share/doc' / args.package
         doc.mkdir(parents=True)
         (doc / 'changelog.gz').write_bytes(gzip.compress((debian / 'changelog').read_bytes(), mtime=0))
+        # Match Make's standard dh sequence instead of preserving the checkout
+        # umask on configuration, documentation and newly created directories.
+        subprocess.run([str(paths['fixperms']), '-p' + args.package], cwd=work,
+                       env=dict(env, DEB_RULES_REQUIRES_ROOT='no'), check=True)
         if makeshlibs:
             run([makeshlibs, '-p' + args.package])
         run([paths['installdeb'], '-p' + args.package])
