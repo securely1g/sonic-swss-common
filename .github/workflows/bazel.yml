@@ -139,6 +139,7 @@ jobs:
             //debian:libswsscommon_check \
             //debian:python3_swsscommon_check \
             //debian:sonic_db_cli_check \
+            //debian:libswsscommon_deb //debian:python3_swsscommon_deb //debian:sonic_db_cli_deb \
             @libyang//:libyang3_deb
           python3 tools/bazel/collect_debian_packages.py artifacts/yang/debian \
             --dependency-deb "$(bazel cquery ${{ matrix.bazel_args }} @libyang//:libyang3_deb --output=files)"
@@ -220,7 +221,8 @@ jobs:
           bazel build ${{ matrix.bazel_args }} --//tools/bazel:yang_modules=False \
             //debian:libswsscommon_check \
             //debian:python3_swsscommon_check \
-            //debian:sonic_db_cli_check
+            //debian:sonic_db_cli_check \
+            //debian:libswsscommon_deb //debian:python3_swsscommon_deb //debian:sonic_db_cli_deb
           python3 tools/bazel/collect_debian_packages.py artifacts/no-yang/debian
 
       - name: Collect no-YANG package artifacts
