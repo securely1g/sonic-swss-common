@@ -13,7 +13,7 @@ def common_debian_package(name, package_name, runtime, dependencies, library = F
         name = name + "_stage",
         srcs = [runtime, "//debian:source_metadata", "//debian:control"],
         outs = [name + "/" + filename for filename in ["data.tar", "substvars", "stage.json"] + controls],
-        tools = [":stage", _TOOLS + "dh_install", _TOOLS + "dh_installdeb"] + ([_TOOLS + "dh_makeshlibs"] if library else []),
+        tools = [":stage", _TOOLS + "dh_install", _TOOLS + "dh_fixperms", _TOOLS + "dh_installdeb"] + ([_TOOLS + "dh_makeshlibs"] if library else []),
         toolchains = ["@bsd_tar_toolchains//:resolved_toolchain"],
         cmd = select({
             "@platforms//cpu:x86_64": "arch=amd64\n",
@@ -25,6 +25,7 @@ $(execpath :stage) --data $(location {runtime}) \\
   --package {package_name} --architecture "$$arch" \\
   --tar "$(BSDTAR_BIN)" \\
   --install $(execpath {tools}dh_install) \\
+  --fixperms $(execpath {tools}dh_fixperms) \\
   --installdeb $(execpath {tools}dh_installdeb) \\
   --output-data $(location {name}/data.tar) \\
   --output-substvars $(location {name}/substvars) \\
