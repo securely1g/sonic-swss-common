@@ -152,3 +152,8 @@ Run the harness tests without building SONiC:
 ```sh
 python3 -m unittest discover -s tools/bazel -p test_cache_benchmark.py
 ```
+
+The pilot is stacked on the native shared-library change in Common #27. Native
+CI and benchmark runs install the pinned Debian runtime dependencies inside their
+disposable Trixie containers and pass that runtime fingerprint to Bazel tests.
+Both local and CI dependency resolution use the maintained registry `main`.

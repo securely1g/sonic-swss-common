@@ -403,6 +403,7 @@ def run(args, secret):
                     "baseline", "combined") else None
                 options += cache_flags(case, args.remote_cache, instance, disk_cache)
                 options += ["--nocache_test_results", "--test_output=errors",
+                            "--test_env=SONIC_TEST_RUNTIME_ID",
                             f"--build_event_json_file={raw_bep}", f"--profile={raw_profile}"]
                 if collect_execution:
                     options += [f"--execution_log_json_file={raw_execution}",
