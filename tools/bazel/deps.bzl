@@ -24,6 +24,7 @@ _APT_DEPS = [
     "@trixie//uuid-dev:uuid",
     "@trixie//libboost-dev:libboost",
     "@trixie//libboost-serialization-dev:libboost-serialization",
+    "//tools/bazel/boost:serialization",
 ]
 
 _YANG_DEPS = select({
@@ -57,7 +58,5 @@ SWSS_COMMON_DEPS = _APT_DEPS + _YANG_DEPS if IS_BZLMOD else []
 
 SWSS_COMMON_COPTS = [] if IS_BZLMOD else _SYSTEM_COPTS
 
-# On bzlmod, `@trixie//libboost-serialization-dev` supplies the headers,
-# but we still have to spell out the flag.
-# On WORKSPACE it is already part of _SYSTEM_LINKOPTS.
-SWSS_COMMON_LINKOPTS = ["-lboost_serialization"] if IS_BZLMOD else _SYSTEM_LINKOPTS
+# Bzlmod dependencies supply declared libraries; WORKSPACE uses system flags.
+SWSS_COMMON_LINKOPTS = [] if IS_BZLMOD else _SYSTEM_LINKOPTS
