@@ -1,13 +1,8 @@
 name: Bazel
-run-name: ${{ inputs.runpath_validation && 'RUNPATH diagnostic' || 'Bazel validation' }}
+run-name: Bazel validation
 
 on:
   workflow_dispatch:
-    inputs:
-      runpath_validation:
-        description: Disable RPATH to diagnose uninstalled library lookup
-        type: boolean
-        default: false
   pull_request:
     # Restore [master] when this stacked PR targets master.
     branches: [master, codex/ci-native-matrix-isolation]
@@ -27,12 +22,11 @@ jobs:
     uses: ./.github/workflows/bazel-native.yml
     with:
       arch: AMD64
-      runpath_validation: ${{ inputs.runpath_validation || false }}
       runner: ubuntu-24.04
       bazel_args: ""
 
   bazel-amd64:
-    name: ${{ inputs.runpath_validation && 'RUNPATH diagnostic' || 'Bazel' }} (AMD64)
+    name: Bazel (AMD64)
     if: ${{ always() }}
     needs: native-amd64
     runs-on: ubuntu-24.04
@@ -47,12 +41,11 @@ jobs:
     uses: ./.github/workflows/bazel-native.yml
     with:
       arch: ARM64
-      runpath_validation: ${{ inputs.runpath_validation || false }}
       runner: ubuntu-24.04-arm
       bazel_args: "--config=aarch64"
 
   bazel-arm64:
-    name: ${{ inputs.runpath_validation && 'RUNPATH diagnostic' || 'Bazel' }} (ARM64)
+    name: Bazel (ARM64)
     if: ${{ always() }}
     needs: native-arm64
     runs-on: ubuntu-24.04
@@ -63,7 +56,6 @@ jobs:
         run: test "$NATIVE_RESULT" = success
 
   cgo-headers:
-    if: ${{ !inputs.runpath_validation }}
     name: Cgo headers (${{ matrix.arch }}, external includes ${{ matrix.external_includes }})
     timeout-minutes: 45
     strategy:
