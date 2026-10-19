@@ -11,7 +11,7 @@ on:
 # Keep .bazelrc on main; remove this selection once registry #73–75 merge.
 env:
   SONIC_BAZEL_REGISTRY_URL: https://raw.githubusercontent.com/securely1g/sonic-bazel-registry/codex/source-debian-runtime-permissions
-  SONIC_BAZEL_REGISTRY_REVISION: 7f8a0fd08ceb36cfaca9645a24e7f1dd174e0302
+  SONIC_BAZEL_REGISTRY_REVISION: 67b8decff9e395983d5fdc70b00c7d724f70f725
 
 permissions:
   contents: read
