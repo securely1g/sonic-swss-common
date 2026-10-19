@@ -124,6 +124,8 @@ jobs:
           //crates/swss-common:swss_common
           //crates/swss-common:swss_common_test
           //tools/bazel/rust:shared_serde_test
+          //dist:libswsscommon_sdk
+          //dist:libswsscommon_sdk_test
           //dist:libswsscommon_pkg
           //dist:libswsscommon_pkg.debug_symbols
           //dist:sonic-db-cli_pkg
@@ -165,6 +167,7 @@ jobs:
           mkdir -p artifacts/validation/yang/go
           cp -L bazel-testlogs/goext/swsscommon_runtime_test/test.log bazel-testlogs/goext/swsscommon_runtime_test/test.xml artifacts/validation/yang/go/
           cp \
+            bazel-bin/dist/libswsscommon_sdk.tar \
             bazel-bin/dist/libswsscommon_pkg.tar \
             bazel-bin/dist/libswsscommon_pkg.debug_symbols.tar \
             bazel-bin/dist/sonic-db-cli_pkg.tar \
@@ -201,6 +204,8 @@ jobs:
           //crates/swss-common:swss_common
           //crates/swss-common:swss_common_test
           //tools/bazel/rust:shared_serde_test
+          //dist:libswsscommon_sdk
+          //dist:libswsscommon_sdk_test
           //dist:libswsscommon_pkg
           //dist:libswsscommon_pkg.debug_symbols
           //dist:sonic-db-cli_pkg
@@ -241,6 +246,7 @@ jobs:
           mkdir -p artifacts/validation/no-yang/go
           cp -L bazel-testlogs/goext/swsscommon_runtime_test/test.log bazel-testlogs/goext/swsscommon_runtime_test/test.xml artifacts/validation/no-yang/go/
           cp \
+            bazel-bin/dist/libswsscommon_sdk.tar \
             bazel-bin/dist/libswsscommon_pkg.tar \
             bazel-bin/dist/libswsscommon_pkg.debug_symbols.tar \
             bazel-bin/dist/sonic-db-cli_pkg.tar \

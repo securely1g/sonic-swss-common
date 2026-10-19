@@ -1,6 +1,6 @@
-# TODO(bazel-ready): Restore when we only support Bazel 8+
-# load("@rules_cc//cc:cc_binary.bzl", "cc_binary")
-# load("@rules_cc//cc:cc_library.bzl", "cc_library")
+load("@rules_cc//cc:cc_shared_library.bzl", "cc_shared_library")
+load("@rules_cc//cc:cc_test.bzl", "cc_test")
+load("@sonic_build_infra//cc:shared_library.bzl", "shared_library_cc_info")
 load("//tools/bazel:cc.bzl", "swss_cc_binary", "swss_cc_library")
 load("//tools/bazel:flags.bzl", "CXXFLAGS_COMMON", "DBGFLAGS")
 
@@ -10,7 +10,6 @@ swss_cc_library(
     hdrs = ["sonic-db-cli.h"],
     cxxopts = DBGFLAGS + CXXFLAGS_COMMON,
     visibility = [
-        "//sonic-db-cli/shared:__pkg__",
         "//tests:__pkg__",
     ],
     deps = ["//:libswsscommon"],
@@ -24,16 +23,23 @@ swss_cc_binary(
     deps = [":sonicdbcli"],
 )
 
-# Shared-library rules are isolated from the legacy static-library package.
-alias(
+# Make installs this DSO as part of libswsscommon. Keep its public symbols
+# separate from Common itself, and link against the same runtime library.
+cc_shared_library(
     name = "libsonicdbcli.so.0",
-    actual = "//sonic-db-cli/shared:libsonicdbcli.so.0",
+    dynamic_deps = ["//:libswsscommon_consolidated.so"],
+    shared_lib_name = "libsonicdbcli.so.0",
+    user_link_flags = [
+        "-Wl,-soname,libsonicdbcli.so.0",
+        "-Wl,-z,now",
+    ],
     visibility = ["//visibility:public"],
+    deps = [":sonicdbcli"],
 )
 
-alias(
+shared_library_cc_info(
     name = "sonicdbcli_so",
-    actual = "//sonic-db-cli/shared:sonicdbcli_so",
+    shared_library = ":libsonicdbcli.so.0",
 )
 
 swss_cc_library(

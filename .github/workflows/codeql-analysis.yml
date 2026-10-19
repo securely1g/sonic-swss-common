@@ -10,8 +10,6 @@ on:
   pull_request:
     branches:
       - 'master'
-      # Remove when this stacked PR targets master.
-      - 'codex/ci-native-matrix-isolation'
       - '202[0-9][0-9][0-9]'
   workflow_dispatch:
 

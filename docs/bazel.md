@@ -160,6 +160,7 @@ targets=(
   //tools/bazel/rust:shared_serde_test
   //dist:libswsscommon_pkg
   //dist:libswsscommon_pkg.debug_symbols
+  //dist:libswsscommon_sdk
   //dist:sonic-db-cli_pkg
   //dist:sonic-db-cli_pkg.debug_symbols
   //pyext:swsscommon_pkg
@@ -175,6 +176,7 @@ targets=(
   //tests:shared_library_elf_test
   //sonic-db-cli:shared_library_test
   //dist:libswsscommon_package_test
+  //dist:libswsscommon_sdk_test
   //dist:package_timestamps_test
   //pyext:swsscommon_package_test
 )
@@ -208,22 +210,22 @@ bazel run //tools/bazel/buildifier:buildifier.format.check
 bazel run --config=aarch64 //tools/bazel/buildifier:buildifier.format.check
 ```
 
-The formatting target leaves lint disabled while the build retains intentional
-Bazel 6 compatibility code. The existing `buildifier.check` target remains
+The formatting target leaves lint disabled while legacy compatibility helpers
+remain in the build. The existing `buildifier.check` target remains
 available for reviewing those lint warnings.
 
 ## Shared libraries and runtime paths
 
-`//:libswsscommon_consolidated.so` aliases a `cc_shared_library` target in
-`//shared`, which links directly to `shared/libswsscommon.so.0` in the Bazel
-output directory. The historical target label remains available to consumers;
+`//:libswsscommon_consolidated.so` is a `cc_shared_library` target in the root
+BUILD file. It links directly to `libswsscommon.so.0` in the Bazel output
+directory. The historical target label remains available to consumers;
 it no longer names a directory containing a copied library. The rule includes
 all object files from its direct `//:common` dependency, so the complete public
 C API is exported. Ordinary static consumers still select only the object files
 they need, which allows unit tests to supply mocks.
 
-`//sonic-db-cli:libsonicdbcli.so.0` aliases another `cc_shared_library` target in
-`//sonic-db-cli/shared`, producing `sonic-db-cli/shared/libsonicdbcli.so.0`.
+`//sonic-db-cli:libsonicdbcli.so.0` is defined beside its source in
+`sonic-db-cli/BUILD.bazel`, producing `sonic-db-cli/libsonicdbcli.so.0`.
 It declares Common as a `dynamic_deps` dependency: it calls the shared Common
 library rather than linking another copy into the CLI library. Go and Rust
 consumers use a small `shared_library_cc_info` adapter from `sonic-build-infra`.
@@ -231,9 +233,10 @@ It forwards the native rule's linker information and runtime files in the
 `CcInfo` format those language rules expect; it does not copy or reimport either
 library.
 
-The shared-library rules live in separate packages so that existing Bazel 6
-WORKSPACE users, including P4RT, can still load the static `//:common` and
-`//:libswsscommon` targets without loading the bzlmod-only infrastructure rules.
+Common's source build uses Bazel 8.5.1. P4RT can remain on Bazel 6.4.0 by
+importing the built library and headers from the SDK below. It does not load
+Common's BUILD files, so the shared-library rules no longer need separate
+`shared/` packages.
 
 Imported Debian libraries use the prepared container's system libraries for
 dependencies that do not have their own Bazel search path. For example, ZeroMQ
@@ -277,6 +280,47 @@ For YANG, also pass `--libyang-package` with the path returned by
 ARM64). The Go/Python tests already build this source-owned runtime tar. Start a
 fresh container before another raw native test run, because Common is now
 installed in the previous container's system paths.
+
+## Library and headers for P4RT
+
+`//dist:libswsscommon_sdk` packages Common's built library and public headers.
+P4RT can import these files with Bazel 6.4.0 while Common builds them with
+Bazel 8.5.1. P4RT does not compile Common's sources or evaluate Common's BUILD
+files in this path.
+
+Build and check the YANG-enabled SDK on native AMD64:
+
+```sh
+bazel test --//tools/bazel:yang_modules=True //dist:libswsscommon_sdk_test
+```
+
+Add `--config=aarch64` on native ARM64. Use
+`--//tools/bazel:yang_modules=False` for a no-YANG SDK. The library and generated
+`cfg_schema.h` use the same selected mode; the production P4RT handoff uses
+YANG enabled, matching the usual Common build in Make.
+
+The output is `bazel-bin/dist/libswsscommon_sdk.tar`:
+
+```text
+include/swss/                 All public Common headers
+include/swss/cfg_schema.h     Schema generated for the selected YANG mode
+include/swss/c-api/           Public C headers
+lib/libswsscommon.so.0        Real shared library
+lib/libswsscommon.so          Relative link to libswsscommon.so.0
+```
+
+The SDK test checks every packaged header against its build input, the library's
+architecture and runtime name, its YANG dependency, and equality with the ELF
+in `libswsscommon_pkg.tar`. The normal deployment rule removes Bazel's private
+library search paths before packaging. Matching debug symbols remain in
+`libswsscommon_pkg.debug_symbols.tar`.
+
+The consumer imports `lib/libswsscommon.so.0` with `cc_import` and exposes
+`include` and `include/swss` as header roots. External development and runtime
+dependencies are still required: hiredis, libnl3, ZeroMQ, Boost, UUID,
+nlohmann-json headers, and libyang when enabled. Use the matching Trixie build
+environment and the SDK for the target architecture. The SDK is not a complete
+sysroot and does not install those dependencies or change P4RT's Bazel version.
 
 ## Rust library
 
@@ -347,12 +391,14 @@ artifacts retain native Go and registry evidence. Each includes a
 `feature-mode.txt` receipt. Package artifact names above remain unchanged.
 The CodeQL job retains the Cargo and Bazel module locks.
 
-Every package download contains these six archives:
+Every package download contains these seven archives:
 
 - `libswsscommon_pkg.tar`: `libswsscommon.so.0`, `libsonicdbcli.so.0`, `swssloglevel`, Lua files, and
   database configuration.
 - `libswsscommon_pkg.debug_symbols.tar`: detached debug information for the
   two runtime libraries and `swssloglevel` in `libswsscommon_pkg.tar`.
+- `libswsscommon_sdk.tar`: the same Common runtime library and public headers
+  for consumers that build with a different Bazel version, including P4RT.
 - `sonic-db-cli_pkg.tar`: database CLI.
 - `sonic-db-cli_pkg.debug_symbols.tar`: detached symbols for the database CLI.
 - `swsscommon_pkg.tar.gz`: Python bindings with a stripped native extension.

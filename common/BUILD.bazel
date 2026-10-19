@@ -31,8 +31,8 @@ echo '#endif'
 )
 
 # The standalone Bazel 8 path consumes the registry model set and runs the
-# same Python schema generator as Make. Bazel 6 callers can continue to supply
-# a Make-generated header through --//tools/bazel:cfg_schema.
+# same Python schema generator as Make. An explicit generated-header override
+# remains available through --//tools/bazel:cfg_schema.
 cfg_schema(
     name = "cfg_schema_generated",
     out = "cfg_schema_generated.h",
