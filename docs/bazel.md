@@ -1,5 +1,10 @@
 # Standalone Bazel build
 
+The shared [`.bazelrc`](../.bazelrc) uses the maintained SONiC registry `main`
+branch followed by Bazel Central Registry, including CI and the commands below.
+Module versions, source checksums, package locks and toolchain inputs remain
+pinned. CI retains its generated module lock as resolution evidence.
+
 The standalone build uses Bazel 8.5.1, selected by `.bazelversion`. Install
 [Bazelisk](https://bazel.build/install/bazelisk) and invoke it as `bazel`.
 Dependencies come from the configured SONiC Bazel registry and the Bazel Central
@@ -367,8 +372,9 @@ dependency; it is not distributed as a precompiled Rust package.
 
 ## Build artifacts
 
-Each successful Bazel job uploads its package archives. Open the repository's
-**Actions** tab, select a successful **Bazel** workflow run, and download the
+Each successful native build uploads its package archives. Open the repository's
+**Actions** tab, select a successful **CodeQL** workflow run for AMD64 or
+**Bazel** workflow run for ARM64, and download the
 artifact for your architecture and feature mode from the **Artifacts** section:
 
 - `sonic-swss-common-yang-AMD64`
@@ -376,20 +382,18 @@ artifact for your architecture and feature mode from the **Artifacts** section:
 - `sonic-swss-common-no-yang-AMD64`
 - `sonic-swss-common-no-yang-ARM64`
 
-YANG-enabled and YANG-disabled validation run in separate native jobs for each
-architecture. Each job retains `--sandbox_debug` and its disk-usage snapshots;
-its sandboxes do not accumulate with the other feature mode. The `Bazel (AMD64)`
-and `Bazel (ARM64)` checks each require both feature jobs for that architecture
-to succeed.
-
-The `sonic-swss-common-rust-<architecture>-<mode>` artifacts retain the Rust
-unit-test and shared Serde test XML and logs, the Bazel module lockfile for that
-mode, Common's source `Cargo.lock`, and the tested source commit and tree.
-`<architecture>` is `AMD64` or `ARM64`, and `<mode>` is `enabled` or `disabled`.
-The corresponding `sonic-swss-common-go-validation-<architecture>-<mode>`
-artifacts retain native Go and registry evidence. Each includes a
-`feature-mode.txt` receipt. Package artifact names above remain unchanged.
-The CodeQL job retains the Cargo and Bazel module locks.
+The `sonic-swss-common-rust-AMD64` artifact retains evidence from the combined
+traced build. ARM64 runs each feature mode on a separate runner to keep retained
+sandbox diagnostics within runner capacity; its artifacts are
+`sonic-swss-common-rust-ARM64-enabled` and
+`sonic-swss-common-rust-ARM64-disabled`. These artifacts retain the Rust unit-test
+and shared Serde test XML and logs, each mode's Bazel module lockfile, Common's
+source `Cargo.lock`, and the tested source commit and tree. ARM64 Go validation
+evidence follows the same mode suffixes:
+`sonic-swss-common-go-validation-ARM64-enabled` and
+`sonic-swss-common-go-validation-ARM64-disabled`. The required `Bazel (ARM64)`
+check succeeds only when both native feature jobs succeed. The CodeQL job retains
+the Cargo and Bazel module locks.
 
 Every package download contains these seven archives:
 
@@ -526,10 +530,13 @@ environment providing those dependencies and services.
 ## CodeQL C++ build
 
 The C++ CodeQL job builds with Bazel inside a native AMD64 Debian Trixie
-container. CodeQL records compilation and linkage by observing build processes,
-so this job creates a fresh Bazel output base after CodeQL initialization, uses
-local execution, and disables action caches. Bazelisk and repository download
-caches remain available for tools and dependencies. See
+container. It also runs AMD64 tests and produces the packages listed above;
+the separate Bazel workflow validates ARM64. Manual dispatch follows the same
+division. CodeQL records compilation and linkage by observing build processes,
+so this job creates a fresh Bazel output base after CodeQL initialization and
+uses local execution. Only outputs produced inside this traced job can be reused.
+Disk/remote output caches and remote execution remain disabled. Bazelisk and
+repository download caches remain available for tools and dependencies. See
 [CodeQL and Bazel cache reuse](codeql-cache.md) for the measured cache boundary.
 
 The build passes `--cxxopt=-nostdinc` so local C++ compilation uses the
@@ -540,6 +547,26 @@ The build covers the library, command-line tools, and generated Python SWIG
 wrapper with YANG enabled. The manual `//tests:codeql_test_sources` target also
 compiles all 49 legacy C++ test files, including the YANG fixture source, without
 requiring Redis services.
+
+For YANG, the job first builds the union of required native outputs,
+packages, test executables and analysis targets under CodeQL. It then executes the tests using those outputs,
+with test-result caching disabled. Execution logs must show no build actions in
+this second phase, and every required test must execute and pass. Matching
+runtime/debug archives are copied before changing feature configuration.
+Distinct YANG, debug and linkage configurations still require distinct outputs.
+
+The YANG database and its source archive are finalized before switching to no-YANG:
+generated files can share output paths across feature configurations. The
+no-YANG build and tests then run without tracing, preserving the previous
+YANG-only analysis scope and reusing common outputs from the private build.
+
+The `sonic-swss-common-codeql-cpp` artifact retains build profiles, execution
+logs, generated module resolution, package hashes and source-extraction evidence.
+The existing `Bazel (AMD64)` check requires both native modes and their artifact
+uploads to finish successfully. Missing, failed or skipped native validation
+cannot satisfy it. Security queries then use the finalized YANG database; their
+failures remain visible on the informational `Analyze (cpp)` check. The scan also
+runs after a later native failure when the YANG database was finalized.
 
 ## SWIG constant wrapping
 
@@ -563,3 +590,10 @@ API and verifies build IDs, debug-link checksums and GDB source lookup.
 
 The installed archive uses ordinary Python imports; it does not contain the
 Bazel runfiles loader. Bazel Python consumers still use `//pyext:swsscommon`.
+
+Each native CI configuration retains its generated `MODULE.bazel.lock`, resolved
+module graph, root module declaration and registry configuration with the package
+artifacts under `resolution/`. The receipt records the source revision, YANG
+mode, runner/userspace architecture, selected target platform and SHA-256 hashes.
+The build's lock is saved before graph collection; `module-graph.lock` records
+any additional graph resolution. These are generated evidence, not tracked inputs.
