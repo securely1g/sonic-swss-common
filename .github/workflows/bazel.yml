@@ -16,11 +16,13 @@ env:
 
 jobs:
   build-and-test:
-    name: Bazel (${{ matrix.arch }})
+    name: Native (${{ matrix.arch }}, YANG ${{ matrix.yang }})
     timeout-minutes: 90
     strategy:
       fail-fast: false
       matrix:
+        # Keep retained sandboxes for each feature mode on a separate runner.
+        yang: [enabled, disabled]
         include:
           # AMD64 builds, tests and packages share the traced CodeQL build.
           - arch: ARM64
@@ -45,7 +47,7 @@ jobs:
           bazelisk-version: 1.29.0
           bazelisk-cache: true
           repository-cache: true
-          disk-cache: ${{ github.workflow }}
+          disk-cache: ${{ github.workflow }}-${{ matrix.arch }}-${{ matrix.yang }}
           cache-version: "8.5.1"
 
       - name: Test registry evidence checks
@@ -78,10 +80,12 @@ jobs:
         run: bazel run ${{ matrix.bazel_args }} //tools/bazel/buildifier:buildifier.format.check
 
       - name: Record disk usage before YANG build
+        if: matrix.yang == 'enabled'
         continue-on-error: true
         run: bash tools/bazel/record_disk_usage.sh before-yang
 
       - name: Build and test with YANG
+        if: matrix.yang == 'enabled'
         id: yang_build
         run: >-
           bazel test
@@ -124,11 +128,12 @@ jobs:
           //pyext:swsscommon_package_test
 
       - name: Record disk usage after YANG build
-        if: ${{ always() && (steps.yang_build.outcome == 'success' || steps.yang_build.outcome == 'failure') }}
+        if: ${{ always() && matrix.yang == 'enabled' && (steps.yang_build.outcome == 'success' || steps.yang_build.outcome == 'failure') }}
         continue-on-error: true
         run: bash tools/bazel/record_disk_usage.sh after-yang
 
       - name: Collect YANG package artifacts
+        if: matrix.yang == 'enabled'
         run: |
           test ! -e Cargo.Bazel.lock
           git diff --exit-code HEAD -- Cargo.lock
@@ -153,10 +158,12 @@ jobs:
             --output artifacts/yang/resolution --mode yang --architecture ARM64
 
       - name: Record disk usage before no-YANG build
+        if: matrix.yang == 'disabled'
         continue-on-error: true
         run: bash tools/bazel/record_disk_usage.sh before-no-yang
 
       - name: Build and test without YANG
+        if: matrix.yang == 'disabled'
         id: no_yang_build
         run: >-
           bazel test
@@ -197,11 +204,12 @@ jobs:
           //pyext:swsscommon_package_test
 
       - name: Record disk usage after no-YANG build
-        if: ${{ always() && (steps.no_yang_build.outcome == 'success' || steps.no_yang_build.outcome == 'failure') }}
+        if: ${{ always() && matrix.yang == 'disabled' && (steps.no_yang_build.outcome == 'success' || steps.no_yang_build.outcome == 'failure') }}
         continue-on-error: true
         run: bash tools/bazel/record_disk_usage.sh after-no-yang
 
       - name: Collect no-YANG package artifacts
+        if: matrix.yang == 'disabled'
         run: |
           test ! -e Cargo.Bazel.lock
           git diff --exit-code HEAD -- Cargo.lock
@@ -226,6 +234,7 @@ jobs:
             --output artifacts/no-yang/resolution --mode no-yang --architecture ARM64
 
       - name: Upload YANG package artifacts
+        if: matrix.yang == 'enabled'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: sonic-swss-common-yang-${{ matrix.arch }}
@@ -233,6 +242,7 @@ jobs:
           if-no-files-found: error
 
       - name: Upload no-YANG package artifacts
+        if: matrix.yang == 'disabled'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: sonic-swss-common-no-yang-${{ matrix.arch }}
@@ -253,7 +263,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: sonic-swss-common-rust-${{ matrix.arch }}
+          name: sonic-swss-common-rust-${{ matrix.arch }}-${{ matrix.yang }}
           path: artifacts/validation/
           if-no-files-found: error
 
@@ -265,9 +275,20 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: sonic-swss-common-go-validation-${{ matrix.arch }}
+          name: sonic-swss-common-go-validation-${{ matrix.arch }}-${{ matrix.yang }}
           path: artifacts/validation/
           if-no-files-found: error
+
+  bazel-arm64:
+    name: Bazel (ARM64)
+    if: ${{ always() }}
+    needs: build-and-test
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Require both native feature modes
+        env:
+          NATIVE_RESULT: ${{ needs.build-and-test.result }}
+        run: test "$NATIVE_RESULT" = success
 
   cgo-headers:
     name: Cgo headers (${{ matrix.arch }}, external includes ${{ matrix.external_includes }})
