@@ -12,10 +12,6 @@ on:
 permissions:
   contents: read
 
-# Draft validation of the shared-library helper; restore main after publication.
-env:
-  SONIC_BAZEL_REGISTRY_URL: https://raw.githubusercontent.com/securely1g/sonic-bazel-registry/codex/native-shared-library-preview
-
 jobs:
   native-amd64:
     name: Native AMD64
