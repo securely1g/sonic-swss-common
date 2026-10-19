@@ -9,7 +9,10 @@ swss_cc_library(
     srcs = ["sonic-db-cli.cpp"],
     hdrs = ["sonic-db-cli.h"],
     cxxopts = DBGFLAGS + CXXFLAGS_COMMON,
-    visibility = ["//tests:__pkg__"],
+    visibility = [
+        "//sonic-db-cli/shared:__pkg__",
+        "//tests:__pkg__",
+    ],
     deps = ["//:libswsscommon"],
 )
 
@@ -21,27 +24,16 @@ swss_cc_binary(
     deps = [":sonicdbcli"],
 )
 
-# Make installs this DSO as part of libswsscommon. Keep its public symbols
-# separate from Common itself, and link against the same runtime library.
-swss_cc_binary(
+# Shared-library rules are isolated from the legacy static-library package.
+alias(
     name = "libsonicdbcli.so.0",
-    srcs = [
-        "sonic-db-cli.cpp",
-        "sonic-db-cli.h",
-    ],
-    cxxopts = DBGFLAGS + CXXFLAGS_COMMON,
-    linkopts = [
-        "-Wl,-soname,libsonicdbcli.so.0",
-        "-Wl,-z,now",
-    ],
-    linkshared = True,
+    actual = "//sonic-db-cli/shared:libsonicdbcli.so.0",
     visibility = ["//visibility:public"],
-    deps = ["//:libswsscommon_shared"],
 )
 
-cc_import(
+alias(
     name = "sonicdbcli_so",
-    shared_library = ":libsonicdbcli.so.0",
+    actual = "//sonic-db-cli/shared:sonicdbcli_so",
 )
 
 swss_cc_library(

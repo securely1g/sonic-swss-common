@@ -23,11 +23,10 @@ swig_gen_go(
     swig_lib = ":swig_lib",
 )
 
-# Wrapper cc_library that links the consolidated shared library and exposes
-# swsscommon headers at their bare names (e.g. "dbconnector.h") for CGO.
+# Keep the bare headers expected by CGO, and use the native shared-library
+# linking information instead of treating the built ELF as an imported file.
 cc_library(
     name = "swsscommon_cgo_wrapper",
-    srcs = ["//:libswsscommon_consolidated.so"],
     hdrs = ["//:all_hdrs"],
     linkopts = [
         # Allow undefined symbols resolved at runtime from the consolidated .so
@@ -38,7 +37,7 @@ cc_library(
     visibility = ["//visibility:public"],
     # Keep native link dependencies aligned with :common, including libyang
     # when the feature is enabled.
-    deps = ["//:common_deps"],
+    deps = ["//:libswsscommon_shared"],
 )
 
 # Compile the SWIG-generated wrapper with the C++ toolchain. The separate

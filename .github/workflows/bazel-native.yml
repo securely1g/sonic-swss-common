@@ -3,6 +3,10 @@ name: Native Bazel validation
 on:
   workflow_call:
     inputs:
+      runpath_validation:
+        required: false
+        type: boolean
+        default: false
       arch:
         required: true
         type: string
@@ -17,9 +21,13 @@ on:
 permissions:
   contents: read
 
+# Draft validation of the shared-library helper; restore main after publication.
+env:
+  SONIC_BAZEL_REGISTRY_URL: https://raw.githubusercontent.com/securely1g/sonic-bazel-registry/codex/native-shared-library-preview
+
 jobs:
   native:
-    name: Native (${{ inputs.arch }}, YANG ${{ matrix.yang }})
+    name: ${{ inputs.runpath_validation && 'RUNPATH diagnostic' || 'Native' }} (${{ inputs.arch }}, YANG ${{ matrix.yang }})
     timeout-minutes: 90
     strategy:
       fail-fast: false
@@ -87,6 +95,7 @@ jobs:
         id: yang_build
         run: >-
           bazel test
+          ${{ inputs.runpath_validation && '--config=runpath-validation' || '' }}
           ${{ inputs.bazel_args }}
           --lockfile_mode=update
           --nocache_test_results
@@ -119,6 +128,7 @@ jobs:
           //tests:interface_ut
           //tests:vrf_ut
           //tests:shared_library_runtime_test
+          //tests:shared_library_elf_test
           //sonic-db-cli:shared_library_test
           //tests:defaultvalueprovider_ut
           //dist:libswsscommon_package_test
@@ -163,6 +173,7 @@ jobs:
         id: no_yang_build
         run: >-
           bazel test
+          ${{ inputs.runpath_validation && '--config=runpath-validation' || '' }}
           ${{ inputs.bazel_args }}
           --lockfile_mode=update
           --nocache_test_results
@@ -194,6 +205,7 @@ jobs:
           //tests:interface_ut
           //tests:vrf_ut
           //tests:shared_library_runtime_test
+          //tests:shared_library_elf_test
           //sonic-db-cli:shared_library_test
           //dist:libswsscommon_package_test
           //dist:package_timestamps_test

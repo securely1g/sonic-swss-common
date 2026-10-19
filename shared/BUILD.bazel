@@ -1,0 +1,29 @@
+load("@rules_cc//cc:cc_shared_library.bzl", "cc_shared_library")
+load("@sonic_build_infra//cc:shared_library.bzl", "shared_library_cc_info")
+
+package(default_visibility = ["//visibility:public"])
+
+# cc_shared_library includes every object in its direct :common dependency.
+# Ordinary :common consumers still link selectively, so tests can use mocks.
+# Produce the SONAME filename directly; copying/reimporting the ELF would move
+# it away from the runtime paths calculated when Bazel linked it.
+cc_shared_library(
+    name = "libswsscommon_consolidated.so",
+    shared_lib_name = "libswsscommon.so.0",
+    user_link_flags = [
+        # Allow undefined symbols from external runtime deps (hiredis, zmq, etc.)
+        # These are resolved at runtime when the .so is loaded
+        "-Wl,--allow-shlib-undefined",
+        "-Wl,--undefined-version",
+        # Match the SONAME libtool derives for common/Makefile.am.
+        "-Wl,-soname,libswsscommon.so.0",
+    ],
+    deps = ["//:common"],
+)
+
+# Go and Rust need CcInfo. Forward the native shared-library link information
+# without copying the output or creating a second set of library symlinks.
+shared_library_cc_info(
+    name = "libswsscommon_so",
+    shared_library = ":libswsscommon_consolidated.so",
+)

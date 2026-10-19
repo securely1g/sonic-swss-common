@@ -1,0 +1,23 @@
+load("@rules_cc//cc:cc_shared_library.bzl", "cc_shared_library")
+load("@sonic_build_infra//cc:shared_library.bzl", "shared_library_cc_info")
+
+package(default_visibility = ["//visibility:public"])
+
+# Make installs this DSO as part of libswsscommon. Keep its public symbols
+# separate from Common itself, and link against the same runtime library.
+cc_shared_library(
+    name = "libsonicdbcli.so.0",
+    dynamic_deps = ["//:libswsscommon_consolidated.so"],
+    shared_lib_name = "libsonicdbcli.so.0",
+    user_link_flags = [
+        "-Wl,-soname,libsonicdbcli.so.0",
+        "-Wl,-z,now",
+    ],
+    visibility = ["//visibility:public"],
+    deps = ["//sonic-db-cli:sonicdbcli"],
+)
+
+shared_library_cc_info(
+    name = "sonicdbcli_so",
+    shared_library = ":libsonicdbcli.so.0",
+)

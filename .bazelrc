@@ -17,3 +17,8 @@ common:aarch64 --platforms=@sonic_build_infra//platforms:aarch64_trixie
 
 # Rust 1.90's allocator shim is required when the C++ toolchain links Rust tests.
 build --@rules_rust//rust/settings:experimental_use_allocator_libraries_with_mangled_symbols=True
+
+# Diagnostic opt-out for the infrastructure's RPATH compatibility flag.
+# Imported Debian libraries still need that flag in uninstalled Bazel tests.
+build:runpath-validation --linkopt=-Wl,--enable-new-dtags
+test:runpath-validation --test_env=SWSS_EXPECT_RUNPATH=1
