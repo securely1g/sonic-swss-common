@@ -24,6 +24,28 @@ is needed.
 Package artifacts retain `effective.bazelrc` and the generated module lock for
 dependency inspection.
 
+## Validate the Debian GCC update
+
+This PR selects `sonic-build-infra` `0.0.16-0c1d31528ad50c6505117a6df7409ccebee863cf`, which imports
+pinned Debian GCC packages for native AMD64 and ARM64. While
+[registry PR #80](https://github.com/securely1g/sonic-bazel-registry/pull/80)
+is open, CI explicitly selects its reviewed branch. The checked-in `.bazelrc`
+continues to use registry `main`.
+
+For the same temporary selection locally, record an effective configuration in
+an empty directory, then use it for the build commands below:
+
+```sh
+mkdir -p /tmp/common-debian-gcc-validation
+export SONIC_BAZEL_REGISTRY_URL=https://raw.githubusercontent.com/securely1g/sonic-bazel-registry/codex/debian-gcc-toolchains
+python3 tools/bazel/go_validation.py record /tmp/common-debian-gcc-validation
+bazel --noworkspace_rc --bazelrc=/tmp/common-debian-gcc-validation/effective.bazelrc \
+  build //:libswsscommon_shared
+```
+
+Add `--config=aarch64` on native ARM64. Remove the temporary CI selection after
+the registry entry merges. The module version still selects the reviewed source.
+
 ## Environment
 
 Use a native AMD64 or ARM64 Linux environment with Debian Trixie userspace. The
