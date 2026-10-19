@@ -10,6 +10,10 @@ on:
 permissions:
   contents: read
 
+# Draft validation until registry PR #80 merges; the checked-in registry stays main.
+env:
+  SONIC_BAZEL_REGISTRY_URL: https://raw.githubusercontent.com/securely1g/sonic-bazel-registry/codex/debian-gcc-toolchains
+
 jobs:
   native-amd64:
     name: Native AMD64
