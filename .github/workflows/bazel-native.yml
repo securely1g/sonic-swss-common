@@ -118,6 +118,7 @@ jobs:
           --test_output=errors
           --verbose_failures
           --sandbox_debug
+          @libyang//:libyang_pkg
           //common:cfg_schema_generated
           //:libswsscommon
           //:libswsscommon_shared
@@ -257,12 +258,14 @@ jobs:
         run: |
           installed_runtime_args=()
           if [ '${{ matrix.yang }}' = enabled ]; then
-            # Query the already-built Go test graph with its test environment.
-            # A standalone query can select a different, unbuilt configuration.
+            # Build and query this runtime package as the same top-level target.
+            # A transitive package can use a different configuration. Match the
+            # test-only environment option inherited from .bazelrc too.
             libyang_runtime_archive="$(bazel cquery ${{ inputs.bazel_args }} \
+              --test_env=SWSS_EXPECT_RUNPATH=1 \
               --test_env=SONIC_TEST_RUNTIME_ID \
               --//tools/bazel:yang_modules=True --output=files \
-              'filter("//:libyang_pkg$", deps(//goext:swsscommon_runtime_test))')"
+              '@libyang//:libyang_pkg')"
             if [ ! -f "$libyang_runtime_archive" ]; then
               printf 'Expected one built libyang runtime archive, got: %s\n' "$libyang_runtime_archive" >&2
               exit 1
