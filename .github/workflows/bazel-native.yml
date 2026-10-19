@@ -94,6 +94,9 @@ jobs:
           --output artifacts/validation/test-runtime.json
           --env-file "$GITHUB_ENV"
 
+      - name: Check cache benchmark isolation and reporting
+        run: python3 -m unittest discover -s tools/bazel -p test_cache_benchmark.py
+
       - name: Record disk usage before YANG build
         if: matrix.yang == 'enabled'
         continue-on-error: true
@@ -329,7 +332,7 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: sonic-swss-common-go-validation-${{ inputs.arch }}-${{ matrix.yang }}
-          # Keep source, registry and test receipts; omit raw environment logs.
+          # Raw Bazel event/action logs can contain environment credentials.
           path: |
             artifacts/validation/
             !artifacts/validation/**/*-events.json
