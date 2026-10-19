@@ -32,7 +32,7 @@ bazel_dep(name = "libyang", version = "3.12.2.sonic.1")
 # This published revision uses the public Debian source URL and preserves the
 # SONiC nexthop patch; the older registration points at a retired mirror.
 bazel_dep(name = "libnl3", version = "3.7.0-sonic.2")
-bazel_dep(name = "sonic-build-infra", version = "0.0.16-07a777db629f29ef17c2e65ee30455e2df13fe93", repo_name = "sonic_build_infra")
+bazel_dep(name = "sonic-build-infra", version = "0.0.17-f865a735bacf93e5d49684ecc31884e64e94dcec", repo_name = "sonic_build_infra")
 bazel_dep(name = "sonic-yang-mgmt", version = "1.0.0-9ab452d22773c41783092ae3bd6c206d6c257c8d", repo_name = "sonic_yang_mgmt")
 bazel_dep(name = "sonic-yang-models", version = "1.0.0-9ab452d22773c41783092ae3bd6c206d6c257c8d", repo_name = "sonic_yang_models")
 
@@ -106,4 +106,9 @@ register_toolchains(
 
 # The actual dependencies are listed in sonic-build-infra, and re-exported.
 apt = use_extension("@rules_distroless//apt:extensions.bzl", "apt")
-use_repo(apt, "trixie")
+use_repo(
+    apt,
+    "trixie",
+    boost_serialization_amd64 = "trixie_libboost-serialization1.83.0-amd64_1.83.0-4.2",
+    boost_serialization_arm64 = "trixie_libboost-serialization1.83.0-arm64_1.83.0-4.2",
+)
