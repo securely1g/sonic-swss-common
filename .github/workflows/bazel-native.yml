@@ -270,7 +270,11 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: sonic-swss-common-rust-${{ inputs.arch }}-${{ matrix.yang }}
-          path: artifacts/validation/
+          # Raw Bazel event/action logs can contain environment credentials.
+          path: |
+            artifacts/validation/
+            !artifacts/validation/**/*-events.json
+            !artifacts/validation/**/*-actions*
           if-no-files-found: error
 
       - name: Record resolved Go inputs
@@ -282,5 +286,9 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: sonic-swss-common-go-validation-${{ inputs.arch }}-${{ matrix.yang }}
-          path: artifacts/validation/
+          # Keep source, registry and test receipts; omit raw environment logs.
+          path: |
+            artifacts/validation/
+            !artifacts/validation/**/*-events.json
+            !artifacts/validation/**/*-actions*
           if-no-files-found: error
