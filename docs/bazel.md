@@ -17,15 +17,13 @@ dependency inspection.
 
 ## Validate the shared-library update
 
-This PR selects `sonic-build-infra`
-`0.0.17-f865a735bacf93e5d49684ecc31884e64e94dcec`. It adds the small adapter
-needed to use native `cc_shared_library` outputs from C++, Go, and Rust targets
+This PR uses the small `sonic-build-infra` adapter needed to consume native
+`cc_shared_library` outputs from C++, Go, and Rust targets
 ([infrastructure PR #51](https://github.com/securely1g/sonic-build-infra/pull/51)).
-It retains the RPATH fix from
-[infrastructure PR #50](https://github.com/securely1g/sonic-build-infra/pull/50):
-prebuilt Debian libraries still need it to find their indirect dependencies in
-uninstalled Bazel tests. For example, ZeroMQ needs `libsodium.so.23` but has no
-library search path of its own.
+The native tests use the linker's default RUNPATH behavior. Their disposable
+Trixie container installs the required Debian runtime packages in normal system
+locations. For example, ZeroMQ can find `libsodium.so.23` under `/usr/lib` without
+rewriting ZeroMQ's ELF file or making Common's search path apply recursively.
 
 Until the new infrastructure version is published on registry `main`, CI
 selects the reviewed `codex/native-shared-library-preview` registry branch.
@@ -61,6 +59,39 @@ apt-get update
 apt-get install -y --no-install-recommends \
   binutils build-essential ca-certificates gdb git python3 tar
 ```
+
+### Prepare the native test runtime
+
+Run runtime setup **inside a disposable Trixie container**, after dependency
+analysis and before executing native tests. It requires root in that container.
+Compilation and linking still use Bazel's declared packages and sysroot.
+
+```sh
+bazel build --nobuild --//tools/bazel:yang_modules=False //:libswsscommon_shared
+python3 -B tools/bazel/runtime/prepare.py \
+  --image-reference debian:trixie-20260918 \
+  --output /tmp/common-test-runtime.json
+export SONIC_TEST_RUNTIME_ID="$(python3 -c \
+  'import json; print(json.load(open("/tmp/common-test-runtime.json"))["SONIC_TEST_RUNTIME_ID"])')"
+```
+
+Apply the temporary registry options above while this PR is a Draft; add
+`--config=aarch64` for native ARM64. Use `yang_modules=True` when preparing a YANG
+build. Analysis writes `MODULE.bazel.lock` without compiling the targets.
+
+The setup helper reads versions, snapshot URLs, checksums, and dependency lists
+from that lock. APT downloads and installs missing runtime packages; the helper
+checks their hashes before installation. It uses only the resolved snapshot
+sources and installs no development packages. Existing base packages remain
+unchanged. For example, a newer compatible base libc or UUID library stays in
+place. This is **tests against the prepared container**: actual installed base versions may
+differ from the compilation pins.
+
+The JSON receipt records the build pins, actual installed package versions, and
+shared-library hashes. `SONIC_TEST_RUNTIME_ID` fingerprints that receipt and is
+passed to Bazel as a test environment input. CI also uses
+`--nocache_test_results`. Common and CLI libraries must be absent from system
+paths during these tests, so they cannot mask missing Bazel outputs.
 
 ## Rust dependency resolution
 
@@ -119,7 +150,8 @@ not exercise. Package outputs remain tar archives.
 
 Run the following from the repository root in Bash. Define the common and YANG
 target lists, then run the command matching the machine's native CPU and desired
-feature mode. CI runs both modes with these explicit labels. Explicit labels
+feature mode, after preparing the container runtime above. CI runs both modes
+with these explicit labels. Explicit labels
 make a required output's platform incompatibility fail the invocation instead
 of being skipped by a wildcard.
 
@@ -160,16 +192,16 @@ yang_targets=(
 )
 
 # Native AMD64, YANG enabled (the default)
-bazel test --//tools/bazel:yang_modules=True --test_output=errors "${targets[@]}" "${yang_targets[@]}"
+bazel test --test_env=SONIC_TEST_RUNTIME_ID --nocache_test_results --//tools/bazel:yang_modules=True --test_output=errors "${targets[@]}" "${yang_targets[@]}"
 
 # Native AMD64, YANG disabled
-bazel test --//tools/bazel:yang_modules=False --test_output=errors "${targets[@]}"
+bazel test --test_env=SONIC_TEST_RUNTIME_ID --nocache_test_results --//tools/bazel:yang_modules=False --test_output=errors "${targets[@]}"
 
 # Native ARM64, YANG enabled
-bazel test --config=aarch64 --//tools/bazel:yang_modules=True --test_output=errors "${targets[@]}" "${yang_targets[@]}"
+bazel test --config=aarch64 --test_env=SONIC_TEST_RUNTIME_ID --nocache_test_results --//tools/bazel:yang_modules=True --test_output=errors "${targets[@]}" "${yang_targets[@]}"
 
 # Native ARM64, YANG disabled
-bazel test --config=aarch64 --//tools/bazel:yang_modules=False --test_output=errors "${targets[@]}"
+bazel test --config=aarch64 --test_env=SONIC_TEST_RUNTIME_ID --nocache_test_results --//tools/bazel:yang_modules=False --test_output=errors "${targets[@]}"
 ```
 
 `bazel test` builds the listed libraries, binaries, bindings, and packages as
@@ -210,19 +242,14 @@ The shared-library rules live in separate packages so that existing Bazel 6
 WORKSPACE users, including P4RT, can still load the static `//:common` and
 `//:libswsscommon` targets without loading the bzlmod-only infrastructure rules.
 
-The infrastructure's RPATH compatibility flag is still required by the imported
-Debian libraries in uninstalled tests. For example, ZeroMQ needs `libsodium`, but
-its prebuilt ELF has no path to Bazel's private copy of that library. Changing
-Common's producer to `cc_shared_library` does not change the prebuilt ELF.
-
-`--config=runpath-validation` explicitly selects RUNPATH with
-`-Wl,--enable-new-dtags` to diagnose this boundary. The raw C/C++ and Rust runtime
-tests currently fail with that opt-out; it is not a supported build setting.
-The Bazel workflow's manual `runpath_validation` input runs the same experiment
-on native AMD64 and ARM64 and reports actual failures.
+Imported Debian libraries use the prepared container's system libraries for
+dependencies that do not have their own Bazel search path. For example, ZeroMQ
+can find its indirect `libsodium` dependency through the normal system loader.
+The tests use default linker flags and require RUNPATH rather than RPATH.
+Running them on an unprepared host is not the supported native test environment.
 
 `//tests:shared_library_elf_test` checks both raw libraries' runtime names,
-search-path tags, exported Common C APIs, Boost dependency and the CLI's shared
+RUNPATH tags, exported Common C APIs, Boost dependency and the CLI's shared
 dependency on Common. The existing C, C++ and Rust tests exercise the uninstalled
 library paths. The Go check loads Common with its declared Trixie runtime. Run
 these tests on native AMD64 and ARM64 with YANG enabled and disabled when
@@ -232,6 +259,31 @@ Packaging is a separate step. Runtime archives retain Make's
 `/usr/lib/<architecture>/` layout and remove paths into Bazel's private library
 directories. Installed containers resolve those libraries through their normal
 system loader configuration; they do not use the uninstalled build layout.
+
+After all raw native tests pass, CI installs the current Common and CLI runtime
+tars in the same disposable container. It copies the existing dynamic C and C++
+smoke consumers outside the Bazel output/runfiles tree and runs them with loader
+environment overrides removed. A loader check requires both installed libraries
+to come from `/usr/lib/<architecture>/` and match the archive hashes; the receipt
+also records their build IDs. This tests the shared CLI-to-Common dependency,
+which running the statically linked `sonic-db-cli --help` alone would not cover.
+
+For the no-YANG mode, reproduce that final check with:
+
+```sh
+python3 -B tools/bazel/runtime/installed_check.py \
+  --common-package bazel-bin/dist/libswsscommon_pkg.tar \
+  --cli-package bazel-bin/dist/sonic-db-cli_pkg.tar \
+  --common-probe bazel-bin/tests/shared_library_runtime_test \
+  --cli-probe bazel-bin/sonic-db-cli/shared_library_test \
+  --output /tmp/common-installed-runtime.json
+```
+
+For YANG, also pass `--libyang-package` with the path returned by
+`bazel cquery --output=files @libyang//:libyang_pkg` (add `--config=aarch64` on
+ARM64). The Go/Python tests already build this source-owned runtime tar. Start a
+fresh container before another raw native test run, because Common is now
+installed in the previous container's system paths.
 
 ## Rust library
 

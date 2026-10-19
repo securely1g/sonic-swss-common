@@ -3,10 +3,6 @@ name: Native Bazel validation
 on:
   workflow_call:
     inputs:
-      runpath_validation:
-        required: false
-        type: boolean
-        default: false
       arch:
         required: true
         type: string
@@ -27,7 +23,7 @@ env:
 
 jobs:
   native:
-    name: ${{ inputs.runpath_validation && 'RUNPATH diagnostic' || 'Native' }} (${{ inputs.arch }}, YANG ${{ matrix.yang }})
+    name: Native (${{ inputs.arch }}, YANG ${{ matrix.yang }})
     timeout-minutes: 90
     strategy:
       fail-fast: false
@@ -56,7 +52,9 @@ jobs:
           cache-version: "8.5.1"
 
       - name: Test registry evidence checks
-        run: python3 -m unittest discover -s tools/bazel -p go_validation_test.py -v
+        run: |
+          python3 -m unittest discover -s tools/bazel -p go_validation_test.py -v
+          python3 -B -m unittest discover -s tools/bazel/runtime -p prepare_test.py -v
 
       - name: Record Rust source inputs
         shell: bash
@@ -85,6 +83,21 @@ jobs:
       - name: Check Bazel formatting
         run: bazel run ${{ inputs.bazel_args }} //tools/bazel/buildifier:buildifier.format.check
 
+      - name: Resolve the native runtime dependency versions
+        run: >-
+          bazel build --nobuild
+          ${{ inputs.bazel_args }}
+          --lockfile_mode=update
+          --//tools/bazel:yang_modules=${{ matrix.yang == 'enabled' && 'True' || 'False' }}
+          //:libswsscommon_shared
+
+      - name: Prepare the container runtime
+        run: >-
+          python3 -B tools/bazel/runtime/prepare.py
+          --image-reference debian:trixie-20260918
+          --output artifacts/validation/test-runtime.json
+          --env-file "$GITHUB_ENV"
+
       - name: Record disk usage before YANG build
         if: matrix.yang == 'enabled'
         continue-on-error: true
@@ -95,10 +108,10 @@ jobs:
         id: yang_build
         run: >-
           bazel test
-          ${{ inputs.runpath_validation && '--config=runpath-validation' || '' }}
           ${{ inputs.bazel_args }}
           --lockfile_mode=update
           --nocache_test_results
+          --test_env=SONIC_TEST_RUNTIME_ID
           --execution_log_compact_file=artifacts/validation/yang-actions.binpb.zst
           --build_event_json_file=artifacts/validation/yang-events.json
           --//tools/bazel:yang_modules=True
@@ -173,10 +186,10 @@ jobs:
         id: no_yang_build
         run: >-
           bazel test
-          ${{ inputs.runpath_validation && '--config=runpath-validation' || '' }}
           ${{ inputs.bazel_args }}
           --lockfile_mode=update
           --nocache_test_results
+          --test_env=SONIC_TEST_RUNTIME_ID
           --execution_log_compact_file=artifacts/validation/no-yang-actions.binpb.zst
           --build_event_json_file=artifacts/validation/no-yang-events.json
           --//tools/bazel:yang_modules=False
@@ -238,6 +251,25 @@ jobs:
             bazel-bin/pyext/swsscommon_pkg.tar.gz \
             bazel-bin/pyext/swsscommon_pkg.debug_symbols.tar \
             artifacts/no-yang/
+
+      - name: Test the installed Common and CLI libraries
+        shell: bash
+        run: |
+          installed_runtime_args=()
+          if [ '${{ matrix.yang }}' = enabled ]; then
+            # Already built by the Go/Python runtime tests above; no new action.
+            libyang_runtime_archive="$(bazel cquery ${{ inputs.bazel_args }} \
+              --//tools/bazel:yang_modules=True --output=files @libyang//:libyang_pkg)"
+            test -f "$libyang_runtime_archive"
+            installed_runtime_args+=(--libyang-package "$libyang_runtime_archive")
+          fi
+          python3 -B tools/bazel/runtime/installed_check.py \
+            --common-package bazel-bin/dist/libswsscommon_pkg.tar \
+            --cli-package bazel-bin/dist/sonic-db-cli_pkg.tar \
+            --common-probe bazel-bin/tests/shared_library_runtime_test \
+            --cli-probe bazel-bin/sonic-db-cli/shared_library_test \
+            --output artifacts/validation/installed-runtime.json \
+            "${installed_runtime_args[@]}"
 
       - name: Upload YANG package artifacts
         if: matrix.yang == 'enabled'
