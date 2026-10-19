@@ -157,7 +157,9 @@ jobs:
             /*) test "$output_base" != / ;;
             *) echo "Expected an absolute Bazel output base" >&2; exit 1 ;;
           esac
-          bazel shutdown
+          # The successful build and artifact collection have finished. Keep the
+          # idle server and action cache for the next build instead of waiting
+          # for server shutdown inside the container.
           rm -rf -- "$output_base/sandbox"
 
       - name: Record disk usage before no-YANG build
