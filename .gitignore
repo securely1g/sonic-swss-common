@@ -9,6 +9,9 @@
 *.gcov
 *.deb
 
+__pycache__/
+*.py[cod]
+
 # Generated Source #
 ####################
 pyext/swsscommon.py
