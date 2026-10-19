@@ -260,7 +260,6 @@ jobs:
             # Query the already-built Go test graph with its test environment.
             # A standalone query can select a different, unbuilt configuration.
             libyang_runtime_archive="$(bazel cquery ${{ inputs.bazel_args }} \
-              --test_env=SWSS_EXPECT_RUNPATH=1 \
               --test_env=SONIC_TEST_RUNTIME_ID \
               --//tools/bazel:yang_modules=True --output=files \
               'filter("//:libyang_pkg$", deps(//goext:swsscommon_runtime_test))')"
