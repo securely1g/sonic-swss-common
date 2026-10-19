@@ -21,8 +21,8 @@ dependency inspection.
 
 ## Validate the Debian GCC update
 
-This PR selects `sonic-build-infra` `0.0.16-0c1d31528ad50c6505117a6df7409ccebee863cf`, which imports
-pinned Debian GCC packages for native AMD64 and ARM64. While
+This PR selects `sonic-build-infra` `0.0.16-72d9705e37d0e83a072cad3eb73b75cd6cc1e4c6`, which imports
+pinned Debian GCC packages for native AMD64 and ARM64. It also preserves the previous linker's shared-library search behavior: an executable can find a library needed by another library, such as Common's hiredis dependency. The fix is reviewed in [infrastructure PR #50](https://github.com/securely1g/sonic-build-infra/pull/50). While
 [registry PR #80](https://github.com/securely1g/sonic-bazel-registry/pull/80)
 is open, CI explicitly selects its reviewed branch. The checked-in `.bazelrc`
 continues to use registry `main`.
