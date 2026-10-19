@@ -32,13 +32,13 @@ bazel_dep(name = "libyang", version = "3.12.2.sonic.1")
 # This published revision uses the public Debian source URL and preserves the
 # SONiC nexthop patch; the older registration points at a retired mirror.
 bazel_dep(name = "libnl3", version = "3.7.0-sonic.2")
-bazel_dep(name = "sonic-build-infra", version = "0.0.16-07a777db629f29ef17c2e65ee30455e2df13fe93", repo_name = "sonic_build_infra")
+bazel_dep(name = "sonic-build-infra", version = "0.0.16-d5cb35774c2c091a57b02386c88d79a96ed894c4", repo_name = "sonic_build_infra")
 
 # Draft integration of the declared Debian metadata tools. Replace this
 # override with their merged registry release before making this PR ready.
 git_override(
     module_name = "sonic-build-infra",
-    commit = "4a1a3287ee859352fe04dd63df3838d5fe00f3a5",
+    commit = "d5cb35774c2c091a57b02386c88d79a96ed894c4",
     remote = "https://github.com/securely1g/sonic-build-infra.git",
 )
 
