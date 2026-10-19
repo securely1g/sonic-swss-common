@@ -10,12 +10,14 @@ on:
   pull_request:
     branches:
       - 'master'
+      # Remove when this stacked PR targets master.
+      - 'codex/ci-native-matrix-isolation'
       - '202[0-9][0-9][0-9]'
   workflow_dispatch:
 
-# Draft validation until registry PR #80 merges; the checked-in registry stays main.
+# Draft validation of the shared-library helper; restore main after publication.
 env:
-  SONIC_BAZEL_REGISTRY_URL: https://raw.githubusercontent.com/securely1g/sonic-bazel-registry/codex/debian-gcc-toolchains
+  SONIC_BAZEL_REGISTRY_URL: https://raw.githubusercontent.com/securely1g/sonic-bazel-registry/codex/native-shared-library-preview
 
 jobs:
   analyze:
