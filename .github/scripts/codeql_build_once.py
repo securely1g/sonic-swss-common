@@ -24,6 +24,7 @@ BUILD_TARGETS = [
     "//:libswsscommon", "//:libswsscommon_shared",
     "//:libswsscommon_consolidated.so", "//:swssloglevel",
     "//crates/swss-common:bindings_dir", "//crates/swss-common:swss_common",
+    "//dist:libswsscommon_sdk",
     "//dist:libswsscommon_pkg",
     "//dist:libswsscommon_pkg.debug_symbols", "//dist:sonic-db-cli_pkg",
     "//dist:sonic-db-cli_pkg.debug_symbols",
@@ -37,8 +38,10 @@ TEST_TARGETS = [
     "//pyext:swsscommon_package_test", "//crates/swss-common:swss_common_test",
     "//tools/bazel/rust:shared_serde_test", "//sonic-db-cli:shared_library_test",
     "//dist:package_timestamps_test",
+    "//dist:libswsscommon_sdk_test", "//tests:shared_library_elf_test",
 ]
 PACKAGES = [
+    "dist/libswsscommon_sdk.tar",
     "dist/libswsscommon_pkg.tar", "dist/libswsscommon_pkg.debug_symbols.tar",
     "dist/sonic-db-cli_pkg.tar", "dist/sonic-db-cli_pkg.debug_symbols.tar",
     "pyext/swsscommon_pkg.tar.gz", "pyext/swsscommon_pkg.debug_symbols.tar",
@@ -164,6 +167,7 @@ def main():
         "--noremote_accept_cached", "--noremote_upload_local_results",
         "--disk_cache=", "--remote_cache=", "--remote_executor=",
         "--cxxopt=-nostdinc", "--jobs=4",
+        "--test_env=SWSS_EXPECT_RUNPATH=1", "--test_env=SONIC_TEST_RUNTIME_ID",
     ]
 
     def run(command, phase, extra=()):
@@ -185,10 +189,19 @@ def main():
         for yang in (traced,):
             mode = "yang" if yang else "no-yang"
             mode_flags = flags + [f"--//tools/bazel:yang_modules={yang}"]
+            # Match the native workflow's pinned system runtime. Analysis
+            # resolves package versions without compiling project sources.
+            run(bazel + ["build", "--nobuild"] + mode_flags,
+                f"{mode}-runtime-analysis", ["//:libswsscommon_shared"])
+            runtime = evidence / f"{mode}-test-runtime.json"
+            run(["python3", "-B", "tools/bazel/runtime/prepare.py",
+                 "--image-reference", "debian:trixie-20260918",
+                 "--output", str(runtime)], f"{mode}-runtime-setup")
+            os.environ["SONIC_TEST_RUNTIME_ID"] = json.loads(runtime.read_text())["SONIC_TEST_RUNTIME_ID"]
             tests = TEST_TARGETS + (["//tests:defaultvalueprovider_ut"] if yang else [])
             targets = BUILD_TARGETS + tests
             if yang:
-                targets += ANALYSIS_TARGETS + ["//common:cfg_schema_generated"]
+                targets += ANALYSIS_TARGETS + ["//common:cfg_schema_generated", "@libyang//:libyang_pkg"]
             targets = list(dict.fromkeys(targets))
             result = {"targets": targets, "flags": mode_flags, "codeql_traced": traced}
             result["build_seconds"] = run(bazel + ["build"] + mode_flags,
@@ -224,6 +237,20 @@ def main():
                 shutil.copyfile(source, destination)
                 result["packages"][destination.name] = hashlib.sha256(
                     destination.read_bytes()).hexdigest()
+            # Installed-library checks run in fresh containers after both
+            # feature builds, so system libraries cannot mask the second build.
+            for name, source in {
+                "common-probe": binary_dir / "tests/shared_library_runtime_test",
+                "cli-probe": binary_dir / "sonic-db-cli/shared_library_test",
+            }.items():
+                shutil.copy2(source, package_dir / name)
+            if yang:
+                source = subprocess.check_output(
+                    bazel + ["cquery"] + mode_flags + ["--output=files", "@libyang//:libyang_pkg"],
+                    text=True).strip()
+                if not Path(source).is_file():
+                    raise RuntimeError("Expected one built libyang runtime archive")
+                shutil.copyfile(source, package_dir / "libyang_pkg.tar")
             result["native_evidence"] = collect_native_evidence(
                 output_base, artifacts / "validation" / mode)
             result["resolution"] = collect_resolution(

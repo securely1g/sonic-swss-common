@@ -16,7 +16,7 @@ def step(name):
 
 
 class NativeGateTest(unittest.TestCase):
-    def gate(self, native, analysis):
+    def gate(self, native, analysis, installed="success"):
         # Resolve the workflow's actual output bindings and execute its shell
         # gate, including empty/skipped results rather than assuming success.
         output = re.search(r"native-result: \$\{\{ steps\.([\w-]+)\.outcome \}\}", CPP)
@@ -26,7 +26,7 @@ class NativeGateTest(unittest.TestCase):
         self.assertIn("RESULT: ${{ needs.analyze-cpp.outputs.native-result }}", GATE)
         self.assertNotIn("needs.analyze-cpp.result", GATE)
         command = re.search(r"^        run: (.+)$", GATE, re.M).group(1)
-        return subprocess.run(["sh", "-c", command], env={**os.environ, "RESULT": result}).returncode
+        return subprocess.run(["sh", "-c", command], env={**os.environ, "RESULT": result, "INSTALLED_RESULT": installed}).returncode
 
     def test_security_query_or_upload_failure_does_not_fail_completed_native_work(self):
         for result in ("success", "failure", "cancelled", "skipped", ""):
@@ -37,6 +37,12 @@ class NativeGateTest(unittest.TestCase):
         for result in ("failure", "cancelled", "skipped", ""):
             with self.subTest(native=result):
                 self.assertNotEqual(self.gate(result, "success"), 0)
+
+    def test_installed_runtime_failure_cannot_pass_the_native_gate(self):
+        self.assertIn("needs: [analyze-cpp, installed-amd64]", GATE)
+        for result in ("failure", "cancelled", "skipped", ""):
+            with self.subTest(installed=result):
+                self.assertNotEqual(self.gate("success", "success", result), 0)
 
     def test_native_completion_requires_both_modes_and_every_artifact_upload(self):
         marker = step("Record completed native validation")

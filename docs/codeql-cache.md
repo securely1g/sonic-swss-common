@@ -150,3 +150,12 @@ Bazel cache hits.
 Any future policy reusing preparation outputs should establish extraction parity
 and measure the time spent restoring caches and the actual eligible hits on hosted
 runners before claiming a build time saving.
+
+The experiment is stacked on [Common #27](https://github.com/securely1g/sonic-swss-common/pull/27),
+which supplies native shared-library targets and the prepared container runtime.
+The dependency modules come from the merged registry entries on `main`.
+The AMD64 traced build includes the SDK and ELF checks. Each feature mode's
+uploaded TARs and dynamic probes are tested in a separate fresh container;
+those jobs do not compile the source again. `Bazel (AMD64)` requires both
+installed-runtime jobs as well as the traced native build. ARM64 uses the same
+reusable native workflow as the shared-library prerequisite.

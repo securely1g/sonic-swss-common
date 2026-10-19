@@ -13,16 +13,16 @@ import codeql_build_once as build_once
 
 class NativeCoverageTest(unittest.TestCase):
     def test_combined_job_keeps_the_native_targets_in_both_modes(self):
-        workflow = (Path(__file__).parents[1] / "workflows/bazel.yml").read_text()
+        workflow = (Path(__file__).parents[1] / "workflows/bazel-native.yml").read_text()
         for name, yang in (("with YANG", True), ("without YANG", False)):
             command = workflow.split("- name: Build and test " + name + "\n", 1)[1]
             command = command.split("- name:", 1)[0]
-            native = set(re.findall(r"^\s+(//\S+)\s*$", command, re.M))
+            native = set(re.findall(r"^\s+((?:@[^/]+)?//\S+)\s*$", command, re.M))
             self.assertTrue(native)
             combined = set(build_once.BUILD_TARGETS + build_once.TEST_TARGETS)
             if yang:
                 combined.update(build_once.ANALYSIS_TARGETS)
-                combined.update(("//common:cfg_schema_generated", "//tests:defaultvalueprovider_ut"))
+                combined.update(("//common:cfg_schema_generated", "//tests:defaultvalueprovider_ut", "@libyang//:libyang_pkg"))
             with self.subTest(yang=yang):
                 self.assertFalse(native - combined, "Combined AMD64 job drops native targets")
 
