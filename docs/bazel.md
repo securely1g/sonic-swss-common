@@ -203,6 +203,12 @@ Tests validate compilation and behavior; they do not claim byte-for-byte
 equality with Cargo's generated bindings. The Rust library is a source
 dependency; it is not distributed as a precompiled Rust package.
 
+After the YANG build and artifact collection succeed, native CI shuts down Bazel
+and removes that successful mode's temporary sandbox directories before building
+without YANG. Build outputs, caches and collected evidence remain intact. A failed
+YANG step skips this cleanup, preserving its `--sandbox_debug` directories; a
+later no-YANG failure also retains its own sandboxes.
+
 ## Build artifacts
 
 Each successful Bazel job uploads its package archives. Open the repository's

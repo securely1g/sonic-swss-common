@@ -149,6 +149,17 @@ jobs:
             bazel-bin/pyext/swsscommon_pkg.debug_symbols.tar \
             artifacts/yang/
 
+      - name: Reclaim successful YANG sandboxes
+        shell: bash
+        run: |
+          output_base="$(bazel info output_base)"
+          case "$output_base" in
+            /*) test "$output_base" != / ;;
+            *) echo "Expected an absolute Bazel output base" >&2; exit 1 ;;
+          esac
+          bazel shutdown
+          rm -rf -- "$output_base/sandbox"
+
       - name: Record disk usage before no-YANG build
         continue-on-error: true
         run: bash tools/bazel/record_disk_usage.sh before-no-yang
