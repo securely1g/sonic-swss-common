@@ -25,23 +25,17 @@ Trixie container installs the required Debian runtime packages in normal system
 locations. For example, ZeroMQ can find `libsodium.so.23` under `/usr/lib` without
 rewriting ZeroMQ's ELF file or making Common's search path apply recursively.
 
-Until the new infrastructure version is published on registry `main`, CI
-selects the reviewed `codex/native-shared-library-preview` registry branch.
-The checked-in `.bazelrc` continues to use registry `main`.
-
-For the same temporary selection locally, record an effective configuration in
-an empty directory, then use it for the build commands below:
+The adapter is published on the maintained registry through
+[registry PR #81](https://github.com/securely1g/sonic-bazel-registry/pull/81).
+Local builds, native CI and CodeQL use the canonical registry `main` endpoint
+from `.bazelrc`. The declared module version selects the landed infrastructure
+source; CI records the resolved registry revision and generated module lock.
 
 ```sh
-mkdir -p /tmp/common-shared-library-validation
-export SONIC_BAZEL_REGISTRY_URL=https://raw.githubusercontent.com/securely1g/sonic-bazel-registry/codex/native-shared-library-preview
-python3 tools/bazel/go_validation.py record /tmp/common-shared-library-validation
-bazel --noworkspace_rc --bazelrc=/tmp/common-shared-library-validation/effective.bazelrc \
-  build //:libswsscommon_shared
+bazel build //:libswsscommon_shared
 ```
 
-Add `--config=aarch64` on native ARM64. Remove the temporary CI selection after
-the registry entry merges. The module version still selects the reviewed source.
+Add `--config=aarch64` on native ARM64.
 
 ## Environment
 
@@ -75,8 +69,7 @@ export SONIC_TEST_RUNTIME_ID="$(python3 -c \
   'import json; print(json.load(open("/tmp/common-test-runtime.json"))["SONIC_TEST_RUNTIME_ID"])')"
 ```
 
-Apply the temporary registry options above while this PR is a Draft; add
-`--config=aarch64` for native ARM64. Use `yang_modules=True` when preparing a YANG
+Add `--config=aarch64` for native ARM64. Use `yang_modules=True` when preparing a YANG
 build. Analysis writes `MODULE.bazel.lock` without compiling the targets.
 
 The setup helper reads versions, snapshot URLs, checksums, and dependency lists
