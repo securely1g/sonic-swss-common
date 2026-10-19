@@ -12,12 +12,38 @@ Bazel Central Registry as the separate third-party registry. Module versions
 and source checksums still select the dependencies; the registry URL does not
 select their latest source code.
 
-The timestamp integration is published on registry `main`. Builds select its
-landed source version through `MODULE.bazel`; no temporary registry override
-is needed.
-
 Package artifacts retain `effective.bazelrc` and the generated module lock for
 dependency inspection.
+
+## Validate the shared-library update
+
+This PR selects `sonic-build-infra`
+`0.0.17-f865a735bacf93e5d49684ecc31884e64e94dcec`. It adds the small adapter
+needed to use native `cc_shared_library` outputs from C++, Go, and Rust targets
+([infrastructure PR #51](https://github.com/securely1g/sonic-build-infra/pull/51)).
+It retains the RPATH fix from
+[infrastructure PR #50](https://github.com/securely1g/sonic-build-infra/pull/50):
+prebuilt Debian libraries still need it to find their indirect dependencies in
+uninstalled Bazel tests. For example, ZeroMQ needs `libsodium.so.23` but has no
+library search path of its own.
+
+Until the new infrastructure version is published on registry `main`, CI
+selects the reviewed `codex/native-shared-library-preview` registry branch.
+The checked-in `.bazelrc` continues to use registry `main`.
+
+For the same temporary selection locally, record an effective configuration in
+an empty directory, then use it for the build commands below:
+
+```sh
+mkdir -p /tmp/common-shared-library-validation
+export SONIC_BAZEL_REGISTRY_URL=https://raw.githubusercontent.com/securely1g/sonic-bazel-registry/codex/native-shared-library-preview
+python3 tools/bazel/go_validation.py record /tmp/common-shared-library-validation
+bazel --noworkspace_rc --bazelrc=/tmp/common-shared-library-validation/effective.bazelrc \
+  build //:libswsscommon_shared
+```
+
+Add `--config=aarch64` on native ARM64. Remove the temporary CI selection after
+the registry entry merges. The module version still selects the reviewed source.
 
 ## Environment
 
@@ -121,6 +147,7 @@ targets=(
   //tests:interface_ut
   //tests:vrf_ut
   //tests:shared_library_runtime_test
+  //tests:shared_library_elf_test
   //sonic-db-cli:shared_library_test
   //dist:libswsscommon_package_test
   //dist:package_timestamps_test
@@ -159,6 +186,52 @@ bazel run --config=aarch64 //tools/bazel/buildifier:buildifier.format.check
 The formatting target leaves lint disabled while the build retains intentional
 Bazel 6 compatibility code. The existing `buildifier.check` target remains
 available for reviewing those lint warnings.
+
+## Shared libraries and runtime paths
+
+`//:libswsscommon_consolidated.so` aliases a `cc_shared_library` target in
+`//shared`, which links directly to `shared/libswsscommon.so.0` in the Bazel
+output directory. The historical target label remains available to consumers;
+it no longer names a directory containing a copied library. The rule includes
+all object files from its direct `//:common` dependency, so the complete public
+C API is exported. Ordinary static consumers still select only the object files
+they need, which allows unit tests to supply mocks.
+
+`//sonic-db-cli:libsonicdbcli.so.0` aliases another `cc_shared_library` target in
+`//sonic-db-cli/shared`, producing `sonic-db-cli/shared/libsonicdbcli.so.0`.
+It declares Common as a `dynamic_deps` dependency: it calls the shared Common
+library rather than linking another copy into the CLI library. Go and Rust
+consumers use a small `shared_library_cc_info` adapter from `sonic-build-infra`.
+It forwards the native rule's linker information and runtime files in the
+`CcInfo` format those language rules expect; it does not copy or reimport either
+library.
+
+The shared-library rules live in separate packages so that existing Bazel 6
+WORKSPACE users, including P4RT, can still load the static `//:common` and
+`//:libswsscommon` targets without loading the bzlmod-only infrastructure rules.
+
+The infrastructure's RPATH compatibility flag is still required by the imported
+Debian libraries in uninstalled tests. For example, ZeroMQ needs `libsodium`, but
+its prebuilt ELF has no path to Bazel's private copy of that library. Changing
+Common's producer to `cc_shared_library` does not change the prebuilt ELF.
+
+`--config=runpath-validation` explicitly selects RUNPATH with
+`-Wl,--enable-new-dtags` to diagnose this boundary. The raw C/C++ and Rust runtime
+tests currently fail with that opt-out; it is not a supported build setting.
+The Bazel workflow's manual `runpath_validation` input runs the same experiment
+on native AMD64 and ARM64 and reports actual failures.
+
+`//tests:shared_library_elf_test` checks both raw libraries' runtime names,
+search-path tags, exported Common C APIs, Boost dependency and the CLI's shared
+dependency on Common. The existing C, C++ and Rust tests exercise the uninstalled
+library paths. The Go check loads Common with its declared Trixie runtime. Run
+these tests on native AMD64 and ARM64 with YANG enabled and disabled when
+changing the shared-library rules or toolchain runtime paths.
+
+Packaging is a separate step. Runtime archives retain Make's
+`/usr/lib/<architecture>/` layout and remove paths into Bazel's private library
+directories. Installed containers resolve those libraries through their normal
+system loader configuration; they do not use the uninstalled build layout.
 
 ## Rust library
 

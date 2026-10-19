@@ -63,6 +63,19 @@ cc_test(
     deps = ["//:libswsscommon_shared"],
 )
 
+sh_test(
+    name = "shared_library_elf_test",
+    srcs = ["shared_library_elf_test.sh"],
+    args = [
+        "$(location //:libswsscommon_consolidated.so)",
+        "$(location //sonic-db-cli:libsonicdbcli.so.0)",
+    ],
+    data = [
+        "//:libswsscommon_consolidated.so",
+        "//sonic-db-cli:libsonicdbcli.so.0",
+    ],
+)
+
 cc_binary(
     name = "defaultvalueprovider_ut_binary",
     testonly = True,

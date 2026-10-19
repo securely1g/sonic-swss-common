@@ -10,8 +10,14 @@ on:
   pull_request:
     branches:
       - 'master'
+      # Remove when this stacked PR targets master.
+      - 'codex/ci-native-matrix-isolation'
       - '202[0-9][0-9][0-9]'
   workflow_dispatch:
+
+# Draft validation of the shared-library helper; restore main after publication.
+env:
+  SONIC_BAZEL_REGISTRY_URL: https://raw.githubusercontent.com/securely1g/sonic-bazel-registry/codex/native-shared-library-preview
 
 jobs:
   analyze:
