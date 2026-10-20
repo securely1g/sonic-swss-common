@@ -12,12 +12,30 @@ Bazel Central Registry as the separate third-party registry. Module versions
 and source checksums still select the dependencies; the registry URL does not
 select their latest source code.
 
-The timestamp integration is published on registry `main`. Builds select its
-landed source version through `MODULE.bazel`; no temporary registry override
-is needed.
-
 Package artifacts retain `effective.bazelrc` and the generated module lock for
 dependency inspection.
+
+## Validate the shared-library update
+
+This PR uses the small `sonic-build-infra` adapter needed to consume native
+`cc_shared_library` outputs from C++, Go, and Rust targets
+([infrastructure PR #51](https://github.com/securely1g/sonic-build-infra/pull/51)).
+The native tests use the linker's default RUNPATH behavior. Their disposable
+Trixie container installs the required Debian runtime packages in normal system
+locations. For example, ZeroMQ can find `libsodium.so.23` under `/usr/lib` without
+rewriting ZeroMQ's ELF file or making Common's search path apply recursively.
+
+The adapter is published on the maintained registry through
+[registry PR #81](https://github.com/securely1g/sonic-bazel-registry/pull/81).
+Local builds, native CI and CodeQL use the canonical registry `main` endpoint
+from `.bazelrc`. The declared module version selects the landed infrastructure
+source; CI records the resolved registry revision and generated module lock.
+
+```sh
+bazel build //:libswsscommon_shared
+```
+
+Add `--config=aarch64` on native ARM64.
 
 ## Environment
 
@@ -35,6 +53,38 @@ apt-get update
 apt-get install -y --no-install-recommends \
   binutils build-essential ca-certificates gdb git python3 tar
 ```
+
+### Prepare the native test runtime
+
+Run runtime setup **inside a disposable Trixie container**, after dependency
+analysis and before executing native tests. It requires root in that container.
+Compilation and linking still use Bazel's declared packages and sysroot.
+
+```sh
+bazel build --nobuild --//tools/bazel:yang_modules=False //:libswsscommon_shared
+python3 -B tools/bazel/runtime/prepare.py \
+  --image-reference debian:trixie-20260918 \
+  --output /tmp/common-test-runtime.json
+export SONIC_TEST_RUNTIME_ID="$(python3 -c \
+  'import json; print(json.load(open("/tmp/common-test-runtime.json"))["SONIC_TEST_RUNTIME_ID"])')"
+```
+
+Add `--config=aarch64` for native ARM64. Use `yang_modules=True` when preparing a YANG
+build. Analysis writes `MODULE.bazel.lock` without compiling the targets.
+
+The setup helper reads versions, snapshot URLs, checksums, and dependency lists
+from that lock. APT downloads and installs missing runtime packages; the helper
+checks their hashes before installation. It uses only the resolved snapshot
+sources and installs no development packages. Existing base packages remain
+unchanged. For example, a newer compatible base libc or UUID library stays in
+place. This is **tests against the prepared container**: actual installed base versions may
+differ from the compilation pins.
+
+The JSON receipt records the build pins, actual installed package versions, and
+shared-library hashes. `SONIC_TEST_RUNTIME_ID` fingerprints that receipt and is
+passed to Bazel as a test environment input. CI also uses
+`--nocache_test_results`. Common and CLI libraries must be absent from system
+paths during these tests, so they cannot mask missing Bazel outputs.
 
 ## Rust dependency resolution
 
@@ -93,7 +143,8 @@ not exercise. Package outputs remain tar archives.
 
 Run the following from the repository root in Bash. Define the common and YANG
 target lists, then run the command matching the machine's native CPU and desired
-feature mode. CI runs both modes with these explicit labels. Explicit labels
+feature mode, after preparing the container runtime above. CI runs both modes
+with these explicit labels. Explicit labels
 make a required output's platform incompatibility fail the invocation instead
 of being skipped by a wildcard.
 
@@ -109,6 +160,7 @@ targets=(
   //tools/bazel/rust:shared_serde_test
   //dist:libswsscommon_pkg
   //dist:libswsscommon_pkg.debug_symbols
+  //dist:libswsscommon_sdk
   //dist:sonic-db-cli_pkg
   //dist:sonic-db-cli_pkg.debug_symbols
   //pyext:swsscommon_pkg
@@ -121,8 +173,10 @@ targets=(
   //tests:interface_ut
   //tests:vrf_ut
   //tests:shared_library_runtime_test
+  //tests:shared_library_elf_test
   //sonic-db-cli:shared_library_test
   //dist:libswsscommon_package_test
+  //dist:libswsscommon_sdk_test
   //dist:package_timestamps_test
   //pyext:swsscommon_package_test
 )
@@ -133,16 +187,16 @@ yang_targets=(
 )
 
 # Native AMD64, YANG enabled (the default)
-bazel test --//tools/bazel:yang_modules=True --test_output=errors "${targets[@]}" "${yang_targets[@]}"
+bazel test --test_env=SONIC_TEST_RUNTIME_ID --nocache_test_results --//tools/bazel:yang_modules=True --test_output=errors "${targets[@]}" "${yang_targets[@]}"
 
 # Native AMD64, YANG disabled
-bazel test --//tools/bazel:yang_modules=False --test_output=errors "${targets[@]}"
+bazel test --test_env=SONIC_TEST_RUNTIME_ID --nocache_test_results --//tools/bazel:yang_modules=False --test_output=errors "${targets[@]}"
 
 # Native ARM64, YANG enabled
-bazel test --config=aarch64 --//tools/bazel:yang_modules=True --test_output=errors "${targets[@]}" "${yang_targets[@]}"
+bazel test --config=aarch64 --test_env=SONIC_TEST_RUNTIME_ID --nocache_test_results --//tools/bazel:yang_modules=True --test_output=errors "${targets[@]}" "${yang_targets[@]}"
 
 # Native ARM64, YANG disabled
-bazel test --config=aarch64 --//tools/bazel:yang_modules=False --test_output=errors "${targets[@]}"
+bazel test --config=aarch64 --test_env=SONIC_TEST_RUNTIME_ID --nocache_test_results --//tools/bazel:yang_modules=False --test_output=errors "${targets[@]}"
 ```
 
 `bazel test` builds the listed libraries, binaries, bindings, and packages as
@@ -156,9 +210,117 @@ bazel run //tools/bazel/buildifier:buildifier.format.check
 bazel run --config=aarch64 //tools/bazel/buildifier:buildifier.format.check
 ```
 
-The formatting target leaves lint disabled while the build retains intentional
-Bazel 6 compatibility code. The existing `buildifier.check` target remains
+The formatting target leaves lint disabled while legacy compatibility helpers
+remain in the build. The existing `buildifier.check` target remains
 available for reviewing those lint warnings.
+
+## Shared libraries and runtime paths
+
+`//:libswsscommon_consolidated.so` is a `cc_shared_library` target in the root
+BUILD file. It links directly to `libswsscommon.so.0` in the Bazel output
+directory. The historical target label remains available to consumers;
+it no longer names a directory containing a copied library. The rule includes
+all object files from its direct `//:common` dependency, so the complete public
+C API is exported. Ordinary static consumers still select only the object files
+they need, which allows unit tests to supply mocks.
+
+`//sonic-db-cli:libsonicdbcli.so.0` is defined beside its source in
+`sonic-db-cli/BUILD.bazel`, producing `sonic-db-cli/libsonicdbcli.so.0`.
+It declares Common as a `dynamic_deps` dependency: it calls the shared Common
+library rather than linking another copy into the CLI library. Go and Rust
+consumers use a small `shared_library_cc_info` adapter from `sonic-build-infra`.
+It forwards the native rule's linker information and runtime files in the
+`CcInfo` format those language rules expect; it does not copy or reimport either
+library.
+
+Common's source build uses Bazel 8.5.1. P4RT can remain on Bazel 6.4.0 by
+importing the built library and headers from the SDK below. It does not load
+Common's BUILD files, so the shared-library rules no longer need separate
+`shared/` packages.
+
+Imported Debian libraries use the prepared container's system libraries for
+dependencies that do not have their own Bazel search path. For example, ZeroMQ
+can find its indirect `libsodium` dependency through the normal system loader.
+The tests use default linker flags and require RUNPATH rather than RPATH.
+Running them on an unprepared host is not the supported native test environment.
+
+`//tests:shared_library_elf_test` checks both raw libraries' runtime names,
+RUNPATH tags, exported Common C APIs, Boost dependency and the CLI's shared
+dependency on Common. The existing C, C++ and Rust tests exercise the uninstalled
+library paths. The Go check loads Common with its declared Trixie runtime. Run
+these tests on native AMD64 and ARM64 with YANG enabled and disabled when
+changing the shared-library rules or toolchain runtime paths.
+
+Packaging is a separate step. Runtime archives retain Make's
+`/usr/lib/<architecture>/` layout and remove paths into Bazel's private library
+directories. Installed containers resolve those libraries through their normal
+system loader configuration; they do not use the uninstalled build layout.
+
+After all raw native tests pass, CI installs the current Common and CLI runtime
+tars in the same disposable container. It copies the existing dynamic C and C++
+smoke consumers outside the Bazel output/runfiles tree and runs them with loader
+environment overrides removed. A loader check requires both installed libraries
+to come from `/usr/lib/<architecture>/` and match the archive hashes; the receipt
+also records their build IDs. This tests the shared CLI-to-Common dependency,
+which running the statically linked `sonic-db-cli --help` alone would not cover.
+
+For the no-YANG mode, reproduce that final check with:
+
+```sh
+python3 -B tools/bazel/runtime/installed_check.py \
+  --common-package bazel-bin/dist/libswsscommon_pkg.tar \
+  --cli-package bazel-bin/dist/sonic-db-cli_pkg.tar \
+  --common-probe bazel-bin/tests/shared_library_runtime_test \
+  --cli-probe bazel-bin/sonic-db-cli/shared_library_test \
+  --output /tmp/common-installed-runtime.json
+```
+
+For YANG, also pass `--libyang-package` with the path returned by
+`bazel cquery --output=files @libyang//:libyang_pkg` (add `--config=aarch64` on
+ARM64). The Go/Python tests already build this source-owned runtime tar. Start a
+fresh container before another raw native test run, because Common is now
+installed in the previous container's system paths.
+
+## Library and headers for P4RT
+
+`//dist:libswsscommon_sdk` packages Common's built library and public headers.
+P4RT can import these files with Bazel 6.4.0 while Common builds them with
+Bazel 8.5.1. P4RT does not compile Common's sources or evaluate Common's BUILD
+files in this path.
+
+Build and check the YANG-enabled SDK on native AMD64:
+
+```sh
+bazel test --//tools/bazel:yang_modules=True //dist:libswsscommon_sdk_test
+```
+
+Add `--config=aarch64` on native ARM64. Use
+`--//tools/bazel:yang_modules=False` for a no-YANG SDK. The library and generated
+`cfg_schema.h` use the same selected mode; the production P4RT handoff uses
+YANG enabled, matching the usual Common build in Make.
+
+The output is `bazel-bin/dist/libswsscommon_sdk.tar`:
+
+```text
+include/swss/                 All public Common headers
+include/swss/cfg_schema.h     Schema generated for the selected YANG mode
+include/swss/c-api/           Public C headers
+lib/libswsscommon.so.0        Real shared library
+lib/libswsscommon.so          Relative link to libswsscommon.so.0
+```
+
+The SDK test checks every packaged header against its build input, the library's
+architecture and runtime name, its YANG dependency, and equality with the ELF
+in `libswsscommon_pkg.tar`. The normal deployment rule removes Bazel's private
+library search paths before packaging. Matching debug symbols remain in
+`libswsscommon_pkg.debug_symbols.tar`.
+
+The consumer imports `lib/libswsscommon.so.0` with `cc_import` and exposes
+`include` and `include/swss` as header roots. External development and runtime
+dependencies are still required: hiredis, libnl3, ZeroMQ, Boost, UUID,
+nlohmann-json headers, and libyang when enabled. Use the matching Trixie build
+environment and the SDK for the target architecture. The SDK is not a complete
+sysroot and does not install those dependencies or change P4RT's Bazel version.
 
 ## Rust library
 
@@ -229,12 +391,14 @@ artifacts retain native Go and registry evidence. Each includes a
 `feature-mode.txt` receipt. Package artifact names above remain unchanged.
 The CodeQL job retains the Cargo and Bazel module locks.
 
-Every package download contains these six archives:
+Every package download contains these seven archives:
 
 - `libswsscommon_pkg.tar`: `libswsscommon.so.0`, `libsonicdbcli.so.0`, `swssloglevel`, Lua files, and
   database configuration.
 - `libswsscommon_pkg.debug_symbols.tar`: detached debug information for the
   two runtime libraries and `swssloglevel` in `libswsscommon_pkg.tar`.
+- `libswsscommon_sdk.tar`: the same Common runtime library and public headers
+  for consumers that build with a different Bazel version, including P4RT.
 - `sonic-db-cli_pkg.tar`: database CLI.
 - `sonic-db-cli_pkg.debug_symbols.tar`: detached symbols for the database CLI.
 - `swsscommon_pkg.tar.gz`: Python bindings with a stripped native extension.
