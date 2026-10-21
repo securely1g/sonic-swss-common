@@ -129,7 +129,7 @@ def collect(artifacts, config, output_base_file=None):
             errors.append("The resolved rules_go version or cgo repair differs from the reviewed entry")
         if "Build label: 8.5.1" not in (artifacts / "bazel-version.txt").read_text().splitlines():
             errors.append("Bazel is not 8.5.1")
-        goarch = "arm64" if config else "amd64"
+        goarch = "arm64" if "--config=aarch64" in config else "amd64"
         if "go version go1.25.0 linux/" + goarch not in (artifacts / "go-version.txt").read_text().splitlines():
             errors.append("The Go SDK is not the expected native 1.25.0")
         if output_base_file:
@@ -154,7 +154,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("action", choices=["record", "collect"])
     parser.add_argument("artifacts", type=Path)
-    parser.add_argument("--config", choices=["aarch64"])
+    parser.add_argument("--config", choices=["aarch64", "ci-linux-sandbox"], action="append", default=[])
     parser.add_argument("--output-base-file", type=Path)
     args = parser.parse_args()
     artifacts = args.artifacts.resolve()
@@ -162,7 +162,7 @@ def main():
     if args.action == "record":
         record(artifacts)
     else:
-        collect(artifacts, ["--config=aarch64"] if args.config else [], args.output_base_file)
+        collect(artifacts, ["--config=" + config for config in args.config], args.output_base_file)
 
 
 if __name__ == "__main__":
