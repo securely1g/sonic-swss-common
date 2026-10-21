@@ -97,11 +97,13 @@ def collect(artifacts, config, output_base_file=None):
         bazel = ["bazel"]
         if output_base_file:
             bazel.append("--output_base=" + output_base_file.read_text().strip())
+        environment_args = (["--action_env=SONIC_BOOTSTRAP_ENVIRONMENT_ID"]
+                            if os.environ.get("SONIC_BOOTSTRAP_ENVIRONMENT_ID") else [])
         commands = {
             "bazel-version.txt": [*bazel, "version"],
             "module-graph.txt": [*bazel, "mod", "graph", "--lockfile_mode=update"],
             "rules-go-repository.txt": [*bazel, "mod", "show_repo", "@io_bazel_rules_go"],
-            "go-version.txt": [*bazel, "run", *config, "@io_bazel_rules_go//go", "--", "version"],
+            "go-version.txt": [*bazel, "run", *config, *environment_args, "@io_bazel_rules_go//go", "--", "version"],
             "output-base.txt": [*bazel, "info", "--announce_rc", "output_base"],
         }
         for name, command in commands.items():

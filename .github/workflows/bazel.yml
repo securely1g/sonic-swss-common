@@ -70,13 +70,27 @@ jobs:
           - external_includes: disabled
             feature: -external_include_paths
     runs-on: ${{ matrix.runner }}
-    container: debian:trixie-20260918
+    container: debian:trixie-20260918@sha256:9cc080028c43b27d2074d63a5f9caf7166d731494965616c1a6d2827a004585c
     steps:
-      - name: Install host build tools
+      - name: Install pinned bootstrap tools
         run: |
+          # Git and CA certificates must be installed before checkout.
+          rm -f /etc/apt/sources.list /etc/apt/sources.list.d/*
+          printf '%s\n' \
+            'deb [check-valid-until=no] http://snapshot.debian.org/archive/debian/20260918T000000Z trixie main' \
+            'deb [check-valid-until=no] http://snapshot.debian.org/archive/debian-security/20260918T000000Z trixie-security main' \
+            > /etc/apt/sources.list
           apt-get update
-          apt-get install -y --no-install-recommends build-essential ca-certificates git python3 tar
+          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            binutils=2.44-3 build-essential=12.12 ca-certificates=20250419 \
+            gdb=16.3-1 git=1:2.47.3-0+deb13u1 python3=3.13.5-1 tar=1.35+dfsg-3.1
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Verify the pinned bootstrap environment
+        run: |
+          python3 -B tools/bazel/runtime/prepare.py --verify-bootstrap-only \
+            --image-reference debian:trixie-20260918@sha256:9cc080028c43b27d2074d63a5f9caf7166d731494965616c1a6d2827a004585c \
+            --output artifacts/validation/bootstrap-environment.json
+          python3 -c 'import json; print("SONIC_BOOTSTRAP_ENVIRONMENT_ID=" + json.load(open("artifacts/validation/bootstrap-environment.json"))["SONIC_BOOTSTRAP_ENVIRONMENT_ID"])' >> "$GITHUB_ENV"
       - uses: bazel-contrib/setup-bazel@c5acdfb288317d0b5c0bbd7a396a3dc868bb0f86 # 0.19.0
         with:
           bazelisk-version: 1.29.0
@@ -94,6 +108,8 @@ jobs:
           dpkg --print-architecture > artifacts/validation/userspace-architecture.txt
           git -c safe.directory="$GITHUB_WORKSPACE" rev-parse HEAD > artifacts/validation/tested-revision.txt
           bazel test ${{ matrix.bazel_args }} \
+            --action_env=SONIC_BOOTSTRAP_ENVIRONMENT_ID \
+            --test_env=SONIC_BOOTSTRAP_ENVIRONMENT_ID \
             --lockfile_mode=update \
             --nocache_test_results \
             --//tools/bazel:yang_modules=False \

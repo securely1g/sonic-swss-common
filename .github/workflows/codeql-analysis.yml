@@ -47,7 +47,7 @@ jobs:
     name: Analyze (cpp)
     runs-on: ubuntu-24.04
     container:
-      image: debian:trixie-20260918
+      image: debian:trixie-20260918@sha256:9cc080028c43b27d2074d63a5f9caf7166d731494965616c1a6d2827a004585c
       options: --init
     timeout-minutes: 60
     permissions:
@@ -56,14 +56,28 @@ jobs:
       security-events: write
 
     steps:
-    - name: Install host build tools
+    - name: Install pinned bootstrap tools
       run: |
+        # Git and CA certificates must be installed before checkout.
+        rm -f /etc/apt/sources.list /etc/apt/sources.list.d/*
+        printf '%s\n' \
+          'deb [check-valid-until=no] http://snapshot.debian.org/archive/debian/20260918T000000Z trixie main' \
+          'deb [check-valid-until=no] http://snapshot.debian.org/archive/debian-security/20260918T000000Z trixie-security main' \
+          > /etc/apt/sources.list
         apt-get update
-        apt-get install -y --no-install-recommends \
-          binutils build-essential ca-certificates git python3 tar
+        DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+          binutils=2.44-3 build-essential=12.12 ca-certificates=20250419 \
+          gdb=16.3-1 git=1:2.47.3-0+deb13u1 python3=3.13.5-1 tar=1.35+dfsg-3.1
 
     - name: Checkout repository
       uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744 # v3
+
+    - name: Verify the pinned bootstrap environment
+      run: |
+        python3 -B tools/bazel/runtime/prepare.py --verify-bootstrap-only \
+          --image-reference debian:trixie-20260918@sha256:9cc080028c43b27d2074d63a5f9caf7166d731494965616c1a6d2827a004585c \
+          --output artifacts/codeql-go-inputs/bootstrap-environment.json
+        python3 -c 'import json; print("SONIC_BOOTSTRAP_ENVIRONMENT_ID=" + json.load(open("artifacts/codeql-go-inputs/bootstrap-environment.json"))["SONIC_BOOTSTRAP_ENVIRONMENT_ID"])' >> "$GITHUB_ENV"
 
     - name: Configure Git for the container checkout
       run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
@@ -100,6 +114,8 @@ jobs:
         echo "$codeql_bazel_output_base" > artifacts/codeql-go-inputs/build-output-base.txt
         trap 'bazel --output_base="$codeql_bazel_output_base" shutdown' EXIT
         bazel --output_base="$codeql_bazel_output_base" build \
+          --action_env=SONIC_BOOTSTRAP_ENVIRONMENT_ID \
+          --test_env=SONIC_BOOTSTRAP_ENVIRONMENT_ID \
           --lockfile_mode=update \
           --//tools/bazel:yang_modules=True \
           --spawn_strategy=local \

@@ -45,14 +45,35 @@ default; native ARM64 requires `--config=aarch64`. The target libraries link
 against Trixie's glibc 2.41, so CI runs inside a Trixie container on each native
 GitHub-hosted runner.
 
-CI uses `debian:trixie-20260918` and installs these host tools. The package tests
-use `readelf`, `objcopy`, and `nm` from `binutils`, plus GDB, Python, and `tar`.
+CI pins the Debian image by digest and installs bootstrap tools from the
+`20260918T000000Z` Debian and Debian-security snapshots. The
+[bootstrap step](../.github/workflows/bazel-native.yml) selects exact versions of
+binutils, build-essential, CA certificates, GDB, Git, Python and tar, with signed
+APT indexes. Native builds, cgo checks and C++ CodeQL use the same setup.
+
+When updating this environment, refresh the image, snapshot, root versions and
+both architecture inventories together using fresh native containers, then run
+both CI matrices. CI verifies the committed inventory; it does not regenerate it.
+
+To reproduce it, start a disposable native container with the image below, run
+that bootstrap step, and check out this repository. Verify the complete installed
+package inventory against [environment.lock.json](../tools/bazel/runtime/environment.lock.json):
 
 ```sh
-apt-get update
-apt-get install -y --no-install-recommends \
-  binutils build-essential ca-certificates gdb git python3 tar
+export SONIC_CI_IMAGE=debian:trixie-20260918@sha256:9cc080028c43b27d2074d63a5f9caf7166d731494965616c1a6d2827a004585c
+python3 -B tools/bazel/runtime/prepare.py --verify-bootstrap-only \
+  --image-reference "$SONIC_CI_IMAGE" --output /tmp/common-bootstrap.json
+export SONIC_BOOTSTRAP_ENVIRONMENT_ID="$(python3 -c \
+  'import json; print(json.load(open("/tmp/common-bootstrap.json"))["SONIC_BOOTSTRAP_ENVIRONMENT_ID"])')"
 ```
+
+This fixes bootstrap and test userspace; the hosted runner, kernel and CPU remain
+external inputs. [Observed native CI](https://github.com/securely1g/sonic-swss-common/actions/runs/39358711160/job/118419534109)
+uses `processwrapper-sandbox`, which isolates action directories but does not hide
+the host filesystem. [Linux sandboxing](https://bazel.build/docs/sandboxing) adds
+namespace isolation; neither supplies a pinned `/usr`. Compilation uses the
+declared toolchains and sysroot. CodeQL runs local, uncached compilation after
+tracing starts.
 
 ### Prepare the native test runtime
 
@@ -61,9 +82,11 @@ analysis and before executing native tests. It requires root in that container.
 Compilation and linking still use Bazel's declared packages and sysroot.
 
 ```sh
-bazel build --nobuild --//tools/bazel:yang_modules=False //:libswsscommon_shared
+bazel build --nobuild --action_env=SONIC_BOOTSTRAP_ENVIRONMENT_ID \
+  --test_env=SONIC_BOOTSTRAP_ENVIRONMENT_ID \
+  --//tools/bazel:yang_modules=False //:libswsscommon_shared
 python3 -B tools/bazel/runtime/prepare.py \
-  --image-reference debian:trixie-20260918 \
+  --image-reference "$SONIC_CI_IMAGE" \
   --output /tmp/common-test-runtime.json
 export SONIC_TEST_RUNTIME_ID="$(python3 -c \
   'import json; print(json.load(open("/tmp/common-test-runtime.json"))["SONIC_TEST_RUNTIME_ID"])')"
@@ -72,19 +95,17 @@ export SONIC_TEST_RUNTIME_ID="$(python3 -c \
 Add `--config=aarch64` for native ARM64. Use `yang_modules=True` when preparing a YANG
 build. Analysis writes `MODULE.bazel.lock` without compiling the targets.
 
-The setup helper reads versions, snapshot URLs, checksums, and dependency lists
-from that lock. APT downloads and installs missing runtime packages; the helper
-checks their hashes before installation. It uses only the resolved snapshot
-sources and installs no development packages. Existing base packages remain
-unchanged. For example, a newer compatible base libc or UUID library stays in
-place. This is **tests against the prepared container**: actual installed base versions may
-differ from the compilation pins.
+The setup helper checks the bootstrap inventory, then reads runtime versions,
+snapshot URLs, checksums and dependency lists from the module lock. APT installs
+missing runtime packages from those snapshots after hash verification. Existing
+base packages remain unchanged. The prepared-container versions can differ from
+the compilation pins; both are recorded rather than substituting one for the other.
 
-The JSON receipt records the build pins, actual installed package versions, and
-shared-library hashes. `SONIC_TEST_RUNTIME_ID` fingerprints that receipt and is
-passed to Bazel as a test environment input. CI also uses
-`--nocache_test_results`. Common and CLI libraries must be absent from system
-paths during these tests, so they cannot mask missing Bazel outputs.
+Receipts record build pins, actual package versions and shared-library hashes.
+CI passes `SONIC_BOOTSTRAP_ENVIRONMENT_ID` through `--action_env` and `--test_env`,
+and `SONIC_TEST_RUNTIME_ID` through `--test_env`, so changes affect Bazel cache
+inputs. Tests also use `--nocache_test_results`. Common and CLI libraries must be
+absent from system paths during these tests, so they cannot mask missing outputs.
 
 ## Rust dependency resolution
 
@@ -149,6 +170,13 @@ make a required output's platform incompatibility fail the invocation instead
 of being skipped by a wildcard.
 
 ```bash
+runtime_args=(
+  --action_env=SONIC_BOOTSTRAP_ENVIRONMENT_ID
+  --test_env=SONIC_BOOTSTRAP_ENVIRONMENT_ID
+  --test_env=SONIC_TEST_RUNTIME_ID
+  --nocache_test_results
+)
+
 targets=(
   //:libswsscommon
   //:libswsscommon_shared
@@ -187,16 +215,16 @@ yang_targets=(
 )
 
 # Native AMD64, YANG enabled (the default)
-bazel test --test_env=SONIC_TEST_RUNTIME_ID --nocache_test_results --//tools/bazel:yang_modules=True --test_output=errors "${targets[@]}" "${yang_targets[@]}"
+bazel test "${runtime_args[@]}" --//tools/bazel:yang_modules=True --test_output=errors "${targets[@]}" "${yang_targets[@]}"
 
 # Native AMD64, YANG disabled
-bazel test --test_env=SONIC_TEST_RUNTIME_ID --nocache_test_results --//tools/bazel:yang_modules=False --test_output=errors "${targets[@]}"
+bazel test "${runtime_args[@]}" --//tools/bazel:yang_modules=False --test_output=errors "${targets[@]}"
 
 # Native ARM64, YANG enabled
-bazel test --config=aarch64 --test_env=SONIC_TEST_RUNTIME_ID --nocache_test_results --//tools/bazel:yang_modules=True --test_output=errors "${targets[@]}" "${yang_targets[@]}"
+bazel test --config=aarch64 "${runtime_args[@]}" --//tools/bazel:yang_modules=True --test_output=errors "${targets[@]}" "${yang_targets[@]}"
 
 # Native ARM64, YANG disabled
-bazel test --config=aarch64 --test_env=SONIC_TEST_RUNTIME_ID --nocache_test_results --//tools/bazel:yang_modules=False --test_output=errors "${targets[@]}"
+bazel test --config=aarch64 "${runtime_args[@]}" --//tools/bazel:yang_modules=False --test_output=errors "${targets[@]}"
 ```
 
 `bazel test` builds the listed libraries, binaries, bindings, and packages as
@@ -204,10 +232,10 @@ well as running the listed tests. CI also checks Bazel file formatting:
 
 ```sh
 # Native AMD64
-bazel run //tools/bazel/buildifier:buildifier.format.check
+bazel run --action_env=SONIC_BOOTSTRAP_ENVIRONMENT_ID //tools/bazel/buildifier:buildifier.format.check
 
 # Native ARM64
-bazel run --config=aarch64 //tools/bazel/buildifier:buildifier.format.check
+bazel run --config=aarch64 --action_env=SONIC_BOOTSTRAP_ENVIRONMENT_ID //tools/bazel/buildifier:buildifier.format.check
 ```
 
 The formatting target leaves lint disabled while legacy compatibility helpers
