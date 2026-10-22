@@ -150,3 +150,12 @@ alias(
     name = "sonic-db-cli_pkg.debug_symbols",
     actual = "//dist:sonic-db-cli_pkg.debug_symbols",
 )
+
+# Keep package identities beside the runtime TAR producers.
+exports_files(
+    [
+        "runtime_packages.json",
+        "runtime_packages.md",
+    ],
+    visibility = ["//visibility:public"],
+)
