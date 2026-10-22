@@ -26,7 +26,13 @@ jobs:
       matrix:
         yang: [enabled, disabled]
     runs-on: ${{ inputs.runner }}
-    container: debian:trixie-20260918
+    container:
+      image: debian:trixie-20260918
+      # Allow Bazel to create nested namespaces and mount its read-only root.
+      options: >-
+        --cap-add=SYS_ADMIN
+        --security-opt=apparmor=unconfined
+        --security-opt=systempaths=unconfined
     steps:
       - name: Install host build tools
         run: |
@@ -44,7 +50,7 @@ jobs:
           bazelisk-version: 1.29.0
           bazelisk-cache: true
           repository-cache: true
-          disk-cache: ${{ github.workflow }}-${{ inputs.arch }}-${{ matrix.yang }}
+          disk-cache: ${{ github.workflow }}-${{ inputs.arch }}-${{ matrix.yang }}-linux-sandbox
           cache-version: "8.5.1"
 
       - name: Test registry evidence checks
@@ -75,6 +81,11 @@ jobs:
           dpkg --print-architecture > artifacts/validation/userspace-architecture.txt
           git -c safe.directory="$GITHUB_WORKSPACE" rev-parse HEAD > artifacts/validation/tested-revision.txt
           bazel version > artifacts/validation/bazel-version.txt
+
+      - name: Verify Linux sandbox isolation
+        run: >-
+          python3 -B tools/bazel/sandbox/verify.py
+          --output artifacts/validation/linux-sandbox.json -- ${{ inputs.bazel_args }}
 
       - name: Check Bazel formatting
         run: bazel run ${{ inputs.bazel_args }} //tools/bazel/buildifier:buildifier.format.check

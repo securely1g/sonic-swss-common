@@ -18,7 +18,7 @@ jobs:
     with:
       arch: AMD64
       runner: ubuntu-24.04
-      bazel_args: ""
+      bazel_args: "--config=ci-linux-sandbox"
 
   bazel-amd64:
     name: Bazel (AMD64)
@@ -37,7 +37,7 @@ jobs:
     with:
       arch: ARM64
       runner: ubuntu-24.04-arm
-      bazel_args: "--config=aarch64"
+      bazel_args: "--config=aarch64 --config=ci-linux-sandbox"
 
   bazel-arm64:
     name: Bazel (ARM64)
@@ -61,16 +61,22 @@ jobs:
         include:
           - arch: AMD64
             runner: ubuntu-24.04
-            bazel_args: ""
+            bazel_args: "--config=ci-linux-sandbox"
           - arch: ARM64
             runner: ubuntu-24.04-arm
-            bazel_args: --config=aarch64
+            bazel_args: --config=aarch64 --config=ci-linux-sandbox
           - external_includes: enabled
             feature: external_include_paths
           - external_includes: disabled
             feature: -external_include_paths
     runs-on: ${{ matrix.runner }}
-    container: debian:trixie-20260918
+    container:
+      image: debian:trixie-20260918
+      # Allow Bazel to create nested namespaces and mount its read-only root.
+      options: >-
+        --cap-add=SYS_ADMIN
+        --security-opt=apparmor=unconfined
+        --security-opt=systempaths=unconfined
     steps:
       - name: Install host build tools
         run: |
@@ -82,13 +88,17 @@ jobs:
           bazelisk-version: 1.29.0
           bazelisk-cache: true
           repository-cache: true
-          disk-cache: ${{ github.workflow }}-cgo-headers
+          disk-cache: ${{ github.workflow }}-cgo-headers-linux-sandbox
           cache-version: "8.5.1"
       - name: Record maintained registry inputs
         run: python3 tools/bazel/go_validation.py record artifacts/validation
-      - name: Test direct cgo use of the imported hiredis headers
+      - name: Verify Linux sandbox isolation
         run: |
           test ! -e MODULE.bazel.lock
+          python3 -B tools/bazel/sandbox/verify.py \
+            --output artifacts/validation/linux-sandbox.json -- ${{ matrix.bazel_args }}
+      - name: Test direct cgo use of the imported hiredis headers
+        run: |
           mkdir -p artifacts/validation
           uname -m > artifacts/validation/runner-architecture.txt
           dpkg --print-architecture > artifacts/validation/userspace-architecture.txt

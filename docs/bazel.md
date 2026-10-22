@@ -54,6 +54,31 @@ apt-get install -y --no-install-recommends \
   binutils build-essential ca-certificates gdb git python3 tar
 ```
 
+### Linux sandbox in CI
+
+Normal native and cgo CI use `--config=ci-linux-sandbox` on AMD64 and ARM64.
+This requires Bazel's `linux-sandbox` for build actions and tests; unavailable
+Linux sandbox support fails the job instead of falling back to process-wrapper
+or local execution. CodeQL keeps local execution so it can trace compilation.
+
+The disposable GitHub-hosted job containers use these Docker options:
+
+```text
+--cap-add=SYS_ADMIN --security-opt=apparmor=unconfined --security-opt=systempaths=unconfined
+```
+
+These relax the outer container restrictions so Bazel can create namespaces,
+mount a read-only filesystem, and mount `/proc` for its PID namespace. Docker's
+default seccomp profile remains enabled. Each job runs an uncached probe that
+checks separate user, mount and PID namespaces and denies writes to a file
+outside the sandbox. The same probe must fail under process-wrapper execution.
+The validation artifacts retain `linux-sandbox.json` with both results and the
+actual execution runners. The initial CI build uses a new disk-cache key.
+
+Sandboxing does not pin or hide host software, and the default action network
+policy remains unchanged. APT setup, `bazel run`'s final program and the installed
+library check run outside Bazel's action sandbox.
+
 ### Prepare the native test runtime
 
 Run runtime setup **inside a disposable Trixie container**, after dependency
