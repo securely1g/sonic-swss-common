@@ -2,6 +2,11 @@
 
 name: "CodeQL"
 
+# Draft-only composition shared with the native Bazel validation jobs.
+env:
+  SONIC_BAZEL_REGISTRY_URL: https://raw.githubusercontent.com/securely1g/sonic-bazel-registry/codex/single020-common-prerequisites-20261024
+  SONIC_BAZEL_REGISTRY_REVISION: f822aff4207316f48702f55249ff0c6862005dcb
+
 on:
   push:
     branches:

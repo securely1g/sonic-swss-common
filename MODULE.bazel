@@ -26,13 +26,13 @@ bazel_dep(name = "rules_shell", version = "0.6.1")
 bazel_dep(name = "bazel_skylib", version = "1.9.0")
 bazel_dep(name = "platforms", version = "1.1.0")
 bazel_dep(name = "tar.bzl", version = "0.10.5-sonic.1")
-bazel_dep(name = "rules_distroless", version = "0.9.4")
-bazel_dep(name = "libyang", version = "3.12.2.sonic.1")
+bazel_dep(name = "rules_distroless", version = "0.9.4.sonic.13")
+bazel_dep(name = "libyang", version = "3.12.2.sonic.4")
 
 # This published revision uses the public Debian source URL and preserves the
 # SONiC nexthop patch; the older registration points at a retired mirror.
-bazel_dep(name = "libnl3", version = "3.7.0-sonic.2")
-bazel_dep(name = "sonic-build-infra", version = "0.0.17-8baf1ad829c5095297d85148b042145b87d623a3", repo_name = "sonic_build_infra")
+bazel_dep(name = "libnl3", version = "3.7.0.sonic.5")
+bazel_dep(name = "sonic-build-infra", version = "0.0.20-28a3aa9b96f1ce66e4ce04f9a7d26c96e3bbb0c6", repo_name = "sonic_build_infra")
 bazel_dep(name = "sonic-yang-mgmt", version = "1.0.0-9ab452d22773c41783092ae3bd6c206d6c257c8d", repo_name = "sonic_yang_mgmt")
 bazel_dep(name = "sonic-yang-models", version = "1.0.0-9ab452d22773c41783092ae3bd6c206d6c257c8d", repo_name = "sonic_yang_models")
 
@@ -106,6 +106,23 @@ register_toolchains(
 
 # The actual dependencies are listed in sonic-build-infra, and re-exported.
 apt = use_extension("@rules_distroless//apt:extensions.bzl", "apt")
+
+# Expose controls/data for the target libraries already linked by Common.
+apt.install(
+    dependency_set = "trixie",
+    packages = [
+        "libboost-serialization1.83.0",
+        "libhiredis1.1.0",
+        "libpython3.13",
+        "libuuid1",
+        "libzmq5",
+    ],
+    suites = [
+        "trixie",
+        "trixie-updates",
+        "trixie-security",
+    ],
+)
 use_repo(
     apt,
     "trixie",
