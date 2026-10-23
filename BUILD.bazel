@@ -1,6 +1,7 @@
 load("@rules_cc//cc:cc_library.bzl", "cc_library")
 load("@rules_cc//cc:cc_shared_library.bzl", "cc_shared_library")
 load("@sonic_build_infra//cc:shared_library.bzl", "shared_library_cc_info")
+load("@sonic_build_infra//oci:runtime_packages.bzl", "runtime_packages")
 load("//tools/bazel:cc.bzl", "swss_cc_binary")
 load(
     "//tools/bazel:deps.bzl",
@@ -151,11 +152,33 @@ alias(
     actual = "//dist:sonic-db-cli_pkg.debug_symbols",
 )
 
-# Keep package identities beside the runtime TAR producers.
-exports_files(
-    [
-        "runtime_packages.json",
-        "runtime_packages.md",
-    ],
+# Reuse the Debian package declarations and generate dependency controls from
+# these exact source-built TARs. The JSON is a build output, not another recipe.
+runtime_packages(
+    name = "runtime_packages.json",
+    apt_packages = {
+        "@trixie//" + package + ":data": "@trixie//" + package + ":control"
+        for package in [
+            "libboost-serialization1.83.0",
+            "libhiredis1.1.0",
+            "libpython3.13",
+            "libuuid1",
+            "libzmq5",
+        ]
+    },
+    changelog = "debian/changelog",
+    control = "debian/control",
+    debian_files = {"compat": "debian/compat"},
+    dependencies = select({
+        "//tools/bazel:yang_modules_enabled": ["@libyang//:runtime_packages.json"],
+        "//conditions:default": [],
+    }),
+    packages = {
+        "libswsscommon": "//dist:libswsscommon_pkg",
+        "python3-swsscommon": "//pyext:swsscommon_pkg",
+        "sonic-db-cli": "//dist:sonic-db-cli_pkg",
+    },
     visibility = ["//visibility:public"],
 )
+
+exports_files(["runtime_packages.md"])

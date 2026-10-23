@@ -17,6 +17,11 @@ on:
 permissions:
   contents: read
 
+# Draft-only composition of registry#120 and the generated libyang/libnl inputs.
+env:
+  SONIC_BAZEL_REGISTRY_URL: https://raw.githubusercontent.com/securely1g/sonic-bazel-registry/codex/common-full-controls-prerequisites-20261024
+  SONIC_BAZEL_REGISTRY_REVISION: 6f17686c76d9211aabda16aab84f001440036ba1
+
 jobs:
   native:
     name: Native (${{ inputs.arch }}, YANG ${{ matrix.yang }})
@@ -137,6 +142,7 @@ jobs:
           //tools/bazel/rust:shared_serde_test
           //dist:libswsscommon_sdk
           //dist:libswsscommon_sdk_test
+          //:runtime_packages.json
           //dist:libswsscommon_pkg
           //dist:libswsscommon_pkg.debug_symbols
           //dist:sonic-db-cli_pkg
@@ -178,6 +184,7 @@ jobs:
           mkdir -p artifacts/validation/yang/go
           cp -L bazel-testlogs/goext/swsscommon_runtime_test/test.log bazel-testlogs/goext/swsscommon_runtime_test/test.xml artifacts/validation/yang/go/
           cp \
+            bazel-bin/runtime_packages.json \
             bazel-bin/dist/libswsscommon_sdk.tar \
             bazel-bin/dist/libswsscommon_pkg.tar \
             bazel-bin/dist/libswsscommon_pkg.debug_symbols.tar \
@@ -217,6 +224,7 @@ jobs:
           //tools/bazel/rust:shared_serde_test
           //dist:libswsscommon_sdk
           //dist:libswsscommon_sdk_test
+          //:runtime_packages.json
           //dist:libswsscommon_pkg
           //dist:libswsscommon_pkg.debug_symbols
           //dist:sonic-db-cli_pkg
@@ -257,6 +265,7 @@ jobs:
           mkdir -p artifacts/validation/no-yang/go
           cp -L bazel-testlogs/goext/swsscommon_runtime_test/test.log bazel-testlogs/goext/swsscommon_runtime_test/test.xml artifacts/validation/no-yang/go/
           cp \
+            bazel-bin/runtime_packages.json \
             bazel-bin/dist/libswsscommon_sdk.tar \
             bazel-bin/dist/libswsscommon_pkg.tar \
             bazel-bin/dist/libswsscommon_pkg.debug_symbols.tar \
