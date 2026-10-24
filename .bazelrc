@@ -26,3 +26,6 @@ build --@rules_rust//rust/settings:experimental_use_allocator_libraries_with_man
 
 # Native library tests require the linker's default RUNPATH behavior.
 test --test_env=SWSS_EXPECT_RUNPATH=1
+
+# Materialize cached kernel tool files through their original directory aliases.
+build --remote_download_regex=(^|.*/)tools/build_tools/kernel_runtime_(amd64|arm64)(/.*)?$
