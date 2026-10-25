@@ -19,3 +19,17 @@ legacy Make package recipes.
 
 Build the metadata with `bazel build //:runtime_packages.json`. Native CI builds
 this target alongside the corresponding runtime TARs.
+
+## Required package files
+
+The producer declares its required paths in `BUILD.bazel`, next to the
+package-to-TAR mapping. The metadata action checks those paths in the built
+runtime TAR before emitting metadata. For example, a TAR missing
+`usr/lib/{multiarch}/libswsscommon.so.0` fails even if the library compiled.
+`{multiarch}` resolves to the selected AMD64 or ARM64 library directory.
+
+Common owns the library names, Python extension, CLI and raw
+`var/run/redis/sonic-db/database_config.json` path. Its package test also compares
+the installed database configuration with `common/database_config.json`.
+An image owns any integration changes, such as preserving `/var/run -> /run`
+and installing that configuration at `/run/redis/sonic-db/database_config.json`.

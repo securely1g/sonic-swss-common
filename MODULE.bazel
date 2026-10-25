@@ -1,7 +1,7 @@
 # Keep bazel_compatibility in sync with sonic-buildimage's .bazelversion.
 module(
     name = "sonic-swss-common",
-    version = "0.0.4",
+    version = "0.0.6",
     bazel_compatibility = [
         ">=8.5.1",
         "<=8.5.1",
@@ -32,7 +32,7 @@ bazel_dep(name = "libyang", version = "3.12.2.sonic.4")
 # This published revision uses the public Debian source URL and preserves the
 # SONiC nexthop patch; the older registration points at a retired mirror.
 bazel_dep(name = "libnl3", version = "3.7.0.sonic.5")
-bazel_dep(name = "sonic-build-infra", version = "0.0.22-a12bc826d6f811a157db5c7c02a2fe033896cc14", repo_name = "sonic_build_infra")
+bazel_dep(name = "sonic-build-infra", version = "0.0.23-5b224d7190d04f1b7b68429eedfc03b7b1565ed0", repo_name = "sonic_build_infra")
 bazel_dep(name = "sonic-yang-mgmt", version = "1.0.0-9ab452d22773c41783092ae3bd6c206d6c257c8d", repo_name = "sonic_yang_mgmt")
 bazel_dep(name = "sonic-yang-models", version = "1.0.0-9ab452d22773c41783092ae3bd6c206d6c257c8d", repo_name = "sonic_yang_models")
 

@@ -171,12 +171,13 @@ sh_test(
     ] + select({
         "//tools/bazel:yang_modules_enabled": ["enabled"],
         "//conditions:default": ["disabled"],
-    }),
+    }) + ["$(location //common:database_config.json)"],
     data = [
         ":libswsscommon_pkg",
         ":libswsscommon_pkg.debug_symbols",
         ":sonic-db-cli_pkg",
         ":sonic-db-cli_pkg.debug_symbols",
+        "//common:database_config.json",
     ],
 )
 
