@@ -11,11 +11,6 @@ on:
 permissions:
   contents: read
 
-# Draft-only generated libyang/libnl inputs on published infrastructure.
-env:
-  SONIC_BAZEL_REGISTRY_URL: https://raw.githubusercontent.com/securely1g/sonic-bazel-registry/codex/common-infra22-prerequisites-20261024
-  SONIC_BAZEL_REGISTRY_REVISION: f64bb8abd1019187a8cb960a336d5b22c13fa920
-
 jobs:
   native-amd64:
     name: Native AMD64
