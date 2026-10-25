@@ -178,6 +178,15 @@ runtime_packages(
         "python3-swsscommon": "//pyext:swsscommon_pkg",
         "sonic-db-cli": "//dist:sonic-db-cli_pkg",
     },
+    required_paths = {
+        "libswsscommon": [
+            "usr/lib/{multiarch}/libswsscommon.so.0",
+            "usr/lib/{multiarch}/libsonicdbcli.so.0",
+            "var/run/redis/sonic-db/database_config.json",
+        ],
+        "python3-swsscommon": ["usr/lib/python3/dist-packages/swsscommon/_swsscommon.so"],
+        "sonic-db-cli": ["usr/bin/sonic-db-cli"],
+    },
     visibility = ["//visibility:public"],
 )
 
