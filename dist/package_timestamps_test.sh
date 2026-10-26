@@ -15,11 +15,13 @@ with tarfile.open(sys.argv[1]) as archive:
     )]
     required = [archive.getmember(name) for name in (
         "usr/bin/swssloglevel",
-        "var/run/redis/sonic-db/database_config.json",
+        "run/redis/sonic-db/database_config.json",
     )]
     if len(libraries) != 6:
         raise SystemExit(f"Expected six library entries, found {len(libraries)}")
     required.extend(libraries)
+    required.extend(member for member in members
+                    if member.name.startswith("usr/share/swss/") and member.name.endswith(".lua"))
 
 with tarfile.open(sys.argv[2]) as archive:
     required.append(archive.getmember("usr/bin/sonic-db-cli"))
