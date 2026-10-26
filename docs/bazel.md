@@ -601,6 +601,63 @@ Normal native CI reads the remote cache anonymously by default; writer credentia
 enable uploads for allowed master builds. It does not run this separate
 cache-reuse proof on every PR.
 
+The same manual workflow also runs **Common to buildimage** on native
+AMD64 and ARM64. This additional proof builds the YANG-enabled runtime and debug
+TARs that the config-engine image consumes, using Common's candidate source:
+
+| Phase | Workspace | Cache behavior | Required evidence |
+| --- | --- | --- | --- |
+| Seed | Small consumer in Common CI, with Common as an external module | No remote reads; upload newly built results | Every Common C++ compile and link runs in the Linux sandbox |
+| Read back | Clean export of the pinned, merged buildimage revision | Remote reads only; uploads and disk cache disabled | Every Common C++ compile and link is a remote hit, with the same action digest and package hashes |
+
+Each phase uses a separate clean Common source export and Bazel output base. The
+seed directories are deleted before readback. Common is an external module in
+both phases because changing it from a root module to an external dependency can
+change action paths and prevent reuse. The seed consumer declares the dependency
+versions and toolchains needed to match the reviewed buildimage configuration.
+Updating the buildimage pin may therefore require updating that consumer too.
+
+Common and buildimage use `--incompatible_strict_action_env` so a caller's
+`PATH` and `LD_LIBRARY_PATH` cannot silently change compilation cache keys.
+For example, sonic-slave adds `/usr/.cargo/bin` to its client path, while Common
+CI adds Bazelisk's installation. Actions use a fixed path instead, including
+tools built in the execution configuration. Explicit action variables remain
+supported. The seed/read helper passes this setting explicitly because its
+small seed workspace does not inherit Common's `.bazelrc`.
+
+The read phase uses buildimage's real `MODULE.bazel` and `.bazelrc`; it overrides
+only Common's source to test the candidate commit. It builds
+`@sonic_swss_common//dist:libswsscommon_pkg` and its `.debug_symbols` target,
+including the packaging transition that compiles with debug information. This
+checks Common's image inputs; it does not build or claim cache reuse for the
+complete container or VS installer.
+
+The `common-buildimage-cache-amd64` and `common-buildimage-cache-arm64` artifacts
+contain sanitized action inventories, native ELF checks, package hashes, source
+revisions and both generated module locks. Diagnostics include only the action's
+`PATH`, `LD_LIBRARY_PATH` and `PWD`, other environment variable names, and hashes
+of commands and input metadata. Raw commands, unknown environment values and
+client environments remain private. These cross-repository builds run only when
+manually dispatched from master. Normal native PR CI runs all cache regression
+tests, including the cross-repository checks, without seeding the cache.
+
+To prepare the separate Make/`sonic-slave` test, manually run **Bazel remote cache
+validation** from `master` with **seed_for_make** enabled. This opt-in mode builds the Common
+library, `sonic-db-cli` and Python bindings, with each package's debug-symbol TAR,
+plus the Common tools that the image uses during execution. For example, the
+Python runtime TAR is built here so the later image recipe can reuse its SWIG
+compilation as well as the Common library compilation.
+
+This mode uses fresh sources and an output base, disables disk and remote reads,
+uploads newly built results, and requires every Common C++ compile and link to
+execute in the Linux sandbox. The same artifact names contain `cross-repo.json`
+with `mode: make_seed`, six package hashes, a native ELF check for the Common
+library, the source revision, and `seed-MODULE.bazel.lock`. It has only a `seed`
+phase: a successful seed does not claim Make cache hits. The later buildimage job
+must run the actual image recipe with cache writes disabled and compare its
+Common actions against this receipt. Leaving **seed_for_make** disabled preserves
+the two-phase proof described above.
+
 ## CodeQL C++ build
 
 The C++ CodeQL job builds with Bazel inside a native AMD64 Debian Trixie

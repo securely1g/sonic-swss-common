@@ -2,11 +2,91 @@ name: Bazel remote cache validation
 
 on:
   workflow_dispatch:
+    inputs:
+      seed_for_make:
+        description: Seed all Common image inputs for a later Make/sonic-slave cache proof
+        type: boolean
+        default: false
 
 permissions:
   contents: read
 
 jobs:
+  cross-repository:
+    name: Common to buildimage (${{ matrix.arch }})
+    # This manual proof uploads a seed; only master may write the shared cache.
+    if: github.ref == 'refs/heads/master'
+    timeout-minutes: 90
+    env:
+      # Landed buildimage #30: includes the source-built config-engine parent image.
+      BUILDIMAGE_REVISION: b3d6c3971fa2c6ffedf457a9c18c734ba34b0efb
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    container:
+      image: debian:trixie-20260918@sha256:9cc080028c43b27d2074d63a5f9caf7166d731494965616c1a6d2827a004585c
+      options: >-
+        --cap-add=SYS_ADMIN
+        --security-opt=apparmor=unconfined
+        --security-opt=systempaths=unconfined
+    steps:
+      - name: Install execution tools
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends binutils build-essential ca-certificates git python3 tar
+      - name: Checkout Common candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: common
+          persist-credentials: false
+      - name: Checkout the actual buildimage consumer
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: securely1g/sonic-buildimage
+          ref: ${{ env.BUILDIMAGE_REVISION }}
+          path: buildimage
+          persist-credentials: false
+      - uses: bazel-contrib/setup-bazel@c5acdfb288317d0b5c0bbd7a396a3dc868bb0f86 # 0.19.0
+        with:
+          module-root: common
+          bazelisk-version: 1.29.0
+          bazelisk-cache: true
+          repository-cache: true
+          cache-version: "8.5.1"
+      - name: Seed Common and require read-only buildimage cache hits
+        env:
+          BAZEL_REMOTE_AUTH: ${{ secrets.BAZEL_REMOTE_AUTH }}
+          SEED_FOR_MAKE: ${{ inputs.seed_for_make && 'true' || 'false' }}
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE/common"
+          git config --global --add safe.directory "$GITHUB_WORKSPACE/buildimage"
+          python3 -B common/tools/bazel/cache/credentials.py probe \
+            --output artifacts/cache-access.json
+          set --
+          if [ "$SEED_FOR_MAKE" = true ]; then
+            set -- --seed-for-make
+          fi
+          python3 -B common/tools/bazel/cache/cross_repo.py \
+            --buildimage "$GITHUB_WORKSPACE/buildimage" \
+            --buildimage-revision "$BUILDIMAGE_REVISION" \
+            --architecture '${{ matrix.arch }}' --output artifacts/cross-repo.json "$@"
+      - name: Retain cache action digests and package hashes
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: common-buildimage-cache-${{ matrix.arch }}
+          path: |
+            artifacts/*.json
+            artifacts/*-MODULE.bazel.lock
+          if-no-files-found: error
+          retention-days: 14
+
   cache:
     name: Remote cache (${{ matrix.arch }})
     if: github.ref == 'refs/heads/master'

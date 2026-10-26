@@ -1,0 +1,2 @@
+# Separate root-module fixture, copied to a fresh workspace by the cache proof.
+tools/bazel/cache/consumer
