@@ -1,3 +1,4 @@
+load("@tar.bzl", "tar")
 load("//tools/bazel:bzlmod.bzl", "IS_BZLMOD")
 load("//tools/bazel/yang:cfg_schema.bzl", "cfg_schema")
 
@@ -120,9 +121,21 @@ filegroup(
 )
 
 # Redis Lua scripts shipped in the libswsscommon package.
+_LUA_FILES = glob(["*.lua"])
+
 filegroup(
     name = "luas",
-    srcs = glob(["*.lua"]),
+    srcs = _LUA_FILES,
+)
+
+tar(
+    name = "lua_runtime",
+    srcs = _LUA_FILES,
+    default_mtime = "1672560000",
+    mtree = [
+        "usr/share/swss/{} uid=0 gid=0 mode=0644 type=file content=$(location {})".format(name, name)
+        for name in _LUA_FILES
+    ],
 )
 
 exports_files(["database_config.json"])
