@@ -13,6 +13,9 @@ on:
         required: false
         type: string
         default: ""
+    secrets:
+      BAZEL_REMOTE_AUTH:
+        required: false
 
 permissions:
   contents: read
@@ -26,6 +29,8 @@ jobs:
       matrix:
         yang: [enabled, disabled]
     runs-on: ${{ inputs.runner }}
+    env:
+      BAZEL_REMOTE_AUTH: ${{ secrets.BAZEL_REMOTE_AUTH }}
     container:
       image: debian:trixie-20260918
       # Allow Bazel to create nested namespaces and mount its read-only root.
@@ -57,6 +62,10 @@ jobs:
         run: |
           python3 -m unittest discover -s tools/bazel -p go_validation_test.py -v
           python3 -B -m unittest discover -s tools/bazel/runtime -p prepare_test.py -v
+          python3 -B -m unittest discover -s tools/bazel/cache -p '*_test.py' -v
+
+      - name: Configure remote build cache
+        run: bash tools/bazel/cache/configure.sh
 
       - name: Record Rust source inputs
         shell: bash

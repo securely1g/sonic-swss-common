@@ -19,6 +19,8 @@ jobs:
       arch: AMD64
       runner: ubuntu-24.04
       bazel_args: "--config=ci-linux-sandbox"
+    secrets:
+      BAZEL_REMOTE_AUTH: ${{ secrets.BAZEL_REMOTE_AUTH }}
 
   bazel-amd64:
     name: Bazel (AMD64)
@@ -38,6 +40,8 @@ jobs:
       arch: ARM64
       runner: ubuntu-24.04-arm
       bazel_args: "--config=aarch64 --config=ci-linux-sandbox"
+    secrets:
+      BAZEL_REMOTE_AUTH: ${{ secrets.BAZEL_REMOTE_AUTH }}
 
   bazel-arm64:
     name: Bazel (ARM64)
@@ -53,6 +57,8 @@ jobs:
   cgo-headers:
     name: Cgo headers (${{ matrix.arch }}, external includes ${{ matrix.external_includes }})
     timeout-minutes: 45
+    env:
+      BAZEL_REMOTE_AUTH: ${{ secrets.BAZEL_REMOTE_AUTH }}
     strategy:
       fail-fast: false
       matrix:
@@ -90,6 +96,8 @@ jobs:
           repository-cache: true
           disk-cache: ${{ github.workflow }}-cgo-headers-linux-sandbox
           cache-version: "8.5.1"
+      - name: Configure remote build cache
+        run: bash tools/bazel/cache/configure.sh
       - name: Record maintained registry inputs
         run: python3 tools/bazel/go_validation.py record artifacts/validation
       - name: Verify Linux sandbox isolation
