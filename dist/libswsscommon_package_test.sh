@@ -83,6 +83,33 @@ PY
 
 assert_equal "CLI runtime archive filename" "sonic-db-cli_pkg.tar" "$(basename "${cli_archive}")"
 
+# Inspect headers before extraction, which may replace ownership with the test user.
+python3 - "${package_archive}" <<'PY'
+import sys
+import tarfile
+
+with tarfile.open(sys.argv[1]) as archive:
+    members = {member.name.removeprefix("./"): member for member in archive}
+    for name, member in members.items():
+        if (member.uid, member.gid) != (0, 0):
+            raise SystemExit(f"{name}: expected root ownership, found {member.uid}:{member.gid}")
+        if member.issym() and member.mode != 0o777:
+            raise SystemExit(f"{name}: expected symlink mode 0777, found {member.mode:04o}")
+    data = [member for name, member in members.items()
+            if name.startswith("usr/share/swss/") and name.endswith(".lua")]
+    if not data:
+        raise SystemExit("Runtime package contains no Redis Lua scripts")
+    config_path = "run/redis/sonic-db/database_config.json"
+    if config_path not in members:
+        raise SystemExit(f"Runtime package is missing canonical {config_path}")
+    data.append(members[config_path])
+    for member in data:
+        if not member.isfile() or member.mode != 0o644:
+            raise SystemExit(f"{member.name}: expected a regular data file with mode 0644")
+    if any(name == "var/run" or name.startswith("var/run/") for name in members):
+        raise SystemExit("Runtime package must use /run without replacing the base /var/run link")
+PY
+
 soname="libswsscommon.so.0"
 mkdir -p "${package_root}" "${symbols_root}"
 tar --extract --file="${package_archive}" --directory="${package_root}"
@@ -90,14 +117,18 @@ tar --extract --file="${symbols_archive}" --directory="${symbols_root}"
 tar --extract --file="${cli_archive}" --directory="${package_root}"
 tar --extract --file="${cli_symbols_archive}" --directory="${symbols_root}"
 
-# The source package owns its default database configuration. Images may
-# normalize /var/run to /run, but the raw TAR must retain the original file.
-packaged_database_config="${package_root}/var/run/redis/sonic-db/database_config.json"
+# The source TAR uses the canonical path and preserves the original file bytes.
+packaged_database_config="${package_root}/run/redis/sonic-db/database_config.json"
 if [[ ! -f "${packaged_database_config}" || -L "${packaged_database_config}" ]] ||
     ! cmp -s "${database_config}" "${packaged_database_config}"; then
     echo "Packaged database configuration differs from common/database_config.json" >&2
     exit 1
 fi
+
+# Existing callers use /var/run through the base image's standard directory link.
+mkdir -p "${package_root}/var"
+ln -s ../run "${package_root}/var/run"
+cmp "${database_config}" "${package_root}/var/run/redis/sonic-db/database_config.json"
 
 if [[ -e "${package_root}/usr/lib/debug" ]]; then
     echo "Runtime package contains detached debug files" >&2
