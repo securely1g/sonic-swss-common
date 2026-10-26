@@ -548,6 +548,39 @@ endpoints and database configuration, matching Trixie native libraries, and a
 loader configuration that can find them. Run that test separately in an
 environment providing those dependencies and services.
 
+## Remote build cache in CI
+
+Native AMD64/ARM64 CI and the cgo-header jobs can use the HTTPS cache at
+`https://lgh-bazel-87263989.eastus.cloudapp.azure.com/`. Build actions still run
+on the GitHub runner when a matching result is unavailable. The existing
+repository and GitHub disk caches remain enabled, and `--nocache_test_results`
+keeps the declared tests executing on each run.
+
+Configure the repository Actions secret `BAZEL_REMOTE_AUTH` with the complete
+HTTP authorization value: `Basic ` followed by the base64 encoding of
+`username:password`. The top-level workflow passes this secret explicitly to
+the reusable native workflow. The credential helper reads it from the Bazel
+client environment and serves only this cache's HTTPS endpoint. Credentials
+must not be placed in `.bazelrc`, URLs or command arguments: CI retains Bazel
+configuration and resolution evidence as artifacts.
+
+The setup step verifies authenticated access before enabling the cache. PR
+builds read cached results; pushes to `master` and manually dispatched builds
+also upload new results. Fork and Dependabot runs without the secret retain
+the ordinary build path. These upload flags control client behavior; access
+permissions are also governed by the server credential.
+
+The **Bazel remote cache validation** workflow runs only when manually dispatched
+from its **Run workflow** button in GitHub Actions. It checks both native
+architectures and deliberately uploads validation outputs: it builds Common's
+shared library in a fresh output base, then reads it from the remote cache using a
+second fresh output base with uploads and the disk cache disabled. The receipt
+requires remote hits for Common compilation and linking and matching output
+hashes. Only sanitized receipts are uploaded; raw execution logs stay outside
+the artifacts directory. This distinguishes remote reuse from local disk reuse.
+Normal native CI continues to use the remote cache automatically when credentials
+are available; it does not run this separate cache-reuse proof on every PR.
+
 ## CodeQL C++ build
 
 The C++ CodeQL job builds with Bazel inside a native AMD64 Debian Trixie
