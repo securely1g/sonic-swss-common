@@ -6,6 +6,7 @@ symbols_archive="$2"
 cli_archive="$3"
 cli_symbols_archive="$4"
 yang_mode="$5"
+database_config="$6"
 package_root="${TEST_TMPDIR}/libswsscommon-package"
 symbols_root="${TEST_TMPDIR}/libswsscommon-symbols"
 
@@ -88,6 +89,15 @@ tar --extract --file="${package_archive}" --directory="${package_root}"
 tar --extract --file="${symbols_archive}" --directory="${symbols_root}"
 tar --extract --file="${cli_archive}" --directory="${package_root}"
 tar --extract --file="${cli_symbols_archive}" --directory="${symbols_root}"
+
+# The source package owns its default database configuration. Images may
+# normalize /var/run to /run, but the raw TAR must retain the original file.
+packaged_database_config="${package_root}/var/run/redis/sonic-db/database_config.json"
+if [[ ! -f "${packaged_database_config}" || -L "${packaged_database_config}" ]] ||
+    ! cmp -s "${database_config}" "${packaged_database_config}"; then
+    echo "Packaged database configuration differs from common/database_config.json" >&2
+    exit 1
+fi
 
 if [[ -e "${package_root}/usr/lib/debug" ]]; then
     echo "Runtime package contains detached debug files" >&2
