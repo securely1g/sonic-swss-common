@@ -20,7 +20,7 @@ jobs:
       runner: ubuntu-24.04
       bazel_args: "--config=ci-linux-sandbox"
     secrets:
-      BAZEL_REMOTE_AUTH: ${{ secrets.BAZEL_REMOTE_AUTH }}
+      BAZEL_REMOTE_AUTH: ${{ github.ref == 'refs/heads/master' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && secrets.BAZEL_REMOTE_AUTH || '' }}
 
   bazel-amd64:
     name: Bazel (AMD64)
@@ -41,7 +41,7 @@ jobs:
       runner: ubuntu-24.04-arm
       bazel_args: "--config=aarch64 --config=ci-linux-sandbox"
     secrets:
-      BAZEL_REMOTE_AUTH: ${{ secrets.BAZEL_REMOTE_AUTH }}
+      BAZEL_REMOTE_AUTH: ${{ github.ref == 'refs/heads/master' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && secrets.BAZEL_REMOTE_AUTH || '' }}
 
   bazel-arm64:
     name: Bazel (ARM64)
@@ -58,7 +58,7 @@ jobs:
     name: Cgo headers (${{ matrix.arch }}, external includes ${{ matrix.external_includes }})
     timeout-minutes: 45
     env:
-      BAZEL_REMOTE_AUTH: ${{ secrets.BAZEL_REMOTE_AUTH }}
+      BAZEL_REMOTE_AUTH: ${{ github.ref == 'refs/heads/master' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && secrets.BAZEL_REMOTE_AUTH || '' }}
     strategy:
       fail-fast: false
       matrix:

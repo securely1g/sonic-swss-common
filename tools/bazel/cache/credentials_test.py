@@ -90,6 +90,26 @@ class CredentialsTests(TestCase):
                              {"endpoint": cache_credentials.ENDPOINT, "authenticated": True, "status": 200})
             self.assertNotIn(AUTH, output.read_text())
 
+    def test_anonymous_probe_never_reads_or_sends_credentials(self):
+        for auth in (None, AUTH, "malformed-private-test-password"):
+            with self.subTest(auth_present=auth is not None), tempfile.TemporaryDirectory() as directory, \
+                    mock.patch.dict(os.environ, {} if auth is None else {"BAZEL_REMOTE_AUTH": auth}, clear=True), \
+                    mock.patch.object(cache_credentials, "authorization") as authorization, \
+                    mock.patch.object(cache_credentials.urllib.request, "build_opener") as build_opener:
+                response = mock.MagicMock()
+                response.__enter__.return_value.status = 200
+                build_opener.return_value.open.return_value = response
+                output = Path(directory) / "probe.json"
+                self.assertEqual(cache_credentials.main(["probe", "--anonymous", "--output", str(output)]), 0)
+                authorization.assert_not_called()
+                request = build_opener.return_value.open.call_args.args[0]
+                self.assertEqual(request.get_method(), "HEAD")
+                self.assertEqual(request.full_url, cache_credentials.EMPTY_CAS)
+                self.assertIsNone(request.get_header("Authorization"))
+                self.assertEqual(json.loads(output.read_text()),
+                                 {"endpoint": cache_credentials.ENDPOINT, "authenticated": False, "status": 200})
+                self.assertNotIn("private-test-password", output.read_text())
+
     @mock.patch.dict(os.environ, {"BAZEL_REMOTE_AUTH": AUTH})
     def test_probe_rejects_redirect_before_contacting_the_new_host(self):
         requests = []

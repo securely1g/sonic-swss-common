@@ -63,12 +63,12 @@ def transient_failure(error):
     return isinstance(error, TimeoutError)
 
 
-def probe(output):
-    """Check authenticated cache access without uploading data or following redirects."""
+def probe(output, *, anonymous=False):
+    """Check cache reads without uploading data or following redirects."""
     output.unlink(missing_ok=True)
     try:
-        request = urllib.request.Request(EMPTY_CAS, method="HEAD",
-                                         headers={"Authorization": authorization()})
+        headers = {} if anonymous else {"Authorization": authorization()}
+        request = urllib.request.Request(EMPTY_CAS, method="HEAD", headers=headers)
         opener = urllib.request.build_opener(NoRedirects())
         for attempt in range(3):
             try:
@@ -89,7 +89,7 @@ def probe(output):
             receipt["status"] = error.code
         write_receipt(output, receipt)
         raise
-    write_receipt(output, {"endpoint": ENDPOINT, "authenticated": True, "status": 200})
+    write_receipt(output, {"endpoint": ENDPOINT, "authenticated": not anonymous, "status": 200})
 
 
 class Parser(argparse.ArgumentParser):
@@ -103,13 +103,15 @@ def main(argv=None):
     commands.add_parser("get")
     check = commands.add_parser("probe")
     check.add_argument("--output", required=True, type=Path)
+    check.add_argument("--anonymous", action="store_true",
+                       help="Read without sending credentials, even when authentication is available")
     args = parser.parse_args(argv)
     try:
         if args.command == "get":
             json.dump(credentials(json.load(sys.stdin)), sys.stdout)
             sys.stdout.write("\n")
         else:
-            probe(args.output)
+            probe(args.output, anonymous=args.anonymous)
     except (ValueError, OSError, urllib.error.URLError):
         print(ERROR, file=sys.stderr)
         return 1
