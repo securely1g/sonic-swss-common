@@ -22,19 +22,57 @@ COMMON_ACTIONS = {
     "CppCompile": "//:common",
     "CppLink": "//:libswsscommon_consolidated.so",
 }
+LOG_READ_CHUNK_SIZE = 64 * 1024
 
 
 def records(path):
-    """Bazel's execution log is a stream of JSON objects, not a JSON array."""
-    text = path.read_text()
-    decoder = json.JSONDecoder()
-    position = 0
-    while position < len(text):
-        if text[position].isspace():
-            position += 1
-            continue
-        record, position = decoder.raw_decode(text, position)
-        yield record
+    """Read adjacent JSON objects without retaining the whole execution log.
+
+    Bazel pretty-prints records, so neither JSON-array nor JSON-lines readers
+    apply. Locate each object's closing brace outside quoted strings, then let
+    the JSON decoder validate it. Memory is bounded by one record and one chunk.
+    """
+    parts = []
+    depth = 0
+    quoted = False
+    escaped = False
+    with path.open(encoding="utf-8") as stream:
+        while chunk := stream.read(LOG_READ_CHUNK_SIZE):
+            start = 0 if depth else None
+            for position, character in enumerate(chunk):
+                if not depth:
+                    if character.isspace():
+                        continue
+                    if character != "{":
+                        raise ValueError("Expected a JSON object in the execution log")
+                    start = position
+                    depth = 1
+                    continue
+                if quoted:
+                    if escaped:
+                        escaped = False
+                    elif character == "\\":
+                        escaped = True
+                    elif character == '"':
+                        quoted = False
+                elif character == '"':
+                    quoted = True
+                elif character == "{":
+                    depth += 1
+                elif character == "}":
+                    depth -= 1
+                    if not depth:
+                        parts.append(chunk[start:position + 1])
+                        record = json.loads("".join(parts))
+                        parts.clear()
+                        start = None
+                        yield record
+                        del record
+            if start is not None:
+                parts.append(chunk[start:])
+    if parts:
+        # Decode the incomplete object to retain a useful JSON parsing error.
+        json.loads("".join(parts))
 
 
 def summarize(path):

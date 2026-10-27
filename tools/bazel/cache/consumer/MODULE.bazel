@@ -1,0 +1,103 @@
+# This small consumer seeds Common's image-facing runtime package from Common
+# CI. Common is external here, just as it is in the separate buildimage checkout.
+# The test overrides only Common's source with the checkout under review.
+module(
+    name = "sonic-common-cache-consumer",
+    bazel_compatibility = [
+        ">=8.5.1",
+        "<=8.5.1",
+    ],
+)
+
+# Match the Common dependency versions selected by buildimage's reviewed
+# b3d6c3971fa2c6ffedf457a9c18c734ba34b0efb master revision. This is a maintained
+# consumer contract, not a generated copy of buildimage's complete module graph.
+bazel_dep(
+    name = "sonic-swss-common",
+    version = "0.0.6-be3495e6958310cb3dd02d6a290a6564efd9aa95",
+    repo_name = "sonic_swss_common",
+)
+bazel_dep(
+    name = "sonic-build-infra",
+    version = "0.0.23-5b224d7190d04f1b7b68429eedfc03b7b1565ed0",
+    repo_name = "sonic_build_infra",
+)
+bazel_dep(name = "libnl3", version = "3.7.0.sonic.6")
+bazel_dep(name = "libyang", version = "3.12.2.sonic.5")
+bazel_dep(name = "libyang-python", version = "3.1.0.sonic.6", repo_name = "libyang_python")
+bazel_dep(
+    name = "sonic-yang-models",
+    version = "1.0.1-b0a9362a7a1b4b5e1b7188c019d256f7c8aaff9f",
+    repo_name = "sonic_yang_models",
+)
+bazel_dep(
+    name = "sonic-rust-deps",
+    version = "0.0.4-6d9c70f708d7420e9e2b2cdc906b80cee6b140f1",
+    repo_name = "sonic_rust_deps",
+)
+bazel_dep(name = "googletest", version = "1.16.0")
+bazel_dep(name = "rules_cc", version = "0.2.20")
+bazel_dep(name = "rules_python", version = "1.8.0")
+bazel_dep(name = "rules_rs", version = "0.1.0")
+bazel_dep(name = "rules_shell", version = "0.8.0")
+bazel_dep(name = "tar.bzl", version = "0.10.5-sonic.1")
+
+# Dependency overrides do not propagate from Common. Preserve the same patched
+# releases and Bazel-8-compatible C++ rules selected by buildimage.
+single_version_override(
+    module_name = "rules_cc",
+    version = "0.2.20",
+)
+
+single_version_override(
+    module_name = "rules_go",
+    version = "0.64.1-sonic.1",
+)
+
+single_version_override(
+    module_name = "tar.bzl",
+    version = "0.10.5-sonic.1",
+)
+
+# Schema generation must use the same declared execution interpreter. Both
+# versions are also requested by the shared infrastructure's packaging tools.
+python = use_extension("@rules_python//python/extensions:python.bzl", "python")
+python.toolchain(
+    is_default = True,
+    python_version = "3.13",
+)
+python.toolchain(python_version = "3.11")
+
+gcc = use_extension("@sonic_build_infra//toolchains/gcc:extensions.bzl", "gcc")
+use_repo(gcc, "gcc_toolchains")
+
+register_toolchains("@gcc_toolchains//:all")
+
+# Expose the same Rust settings repository used by buildimage's .bazelrc.
+rules_rust = use_extension("@rules_rs//rs:rules_rust.bzl", "rules_rust")
+use_repo(rules_rust, "rules_rust")
+
+# Common registers Rust toolchains even when the requested package is C++.
+# The extension requires a root declaration during toolchain resolution.
+rust = use_extension("@rules_rs//rs:rules_rust_reexported_extensions.bzl", "rust")
+rust.toolchain(
+    edition = "2021",
+    extra_target_triples = [
+        "aarch64-unknown-linux-gnu",
+        "x86_64-unknown-linux-gnu",
+    ],
+    versions = ["1.90.0"],
+)
+use_repo(rust, "rust_toolchains")
+
+register_toolchains("@rust_toolchains//:all")
+
+bindgen = use_extension("@rules_rs//rs:rules_rust_bindgen.bzl", "rules_rust_bindgen")
+use_repo(bindgen, "rules_rust_bindgen")
+
+register_toolchains("@rules_rust_bindgen//:all")
+
+toolchains = use_extension("@tar.bzl//tar:extensions.bzl", "toolchains")
+use_repo(toolchains, "bsd_tar_toolchains")
+
+register_toolchains("@bsd_tar_toolchains//:all")

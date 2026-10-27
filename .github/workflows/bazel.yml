@@ -4,7 +4,8 @@ run-name: Bazel validation
 on:
   workflow_dispatch:
   pull_request:
-    branches: [master]
+    # Temporary base while the cache-policy prerequisite is reviewed separately.
+    branches: [master, codex/master-cache-writes]
   push:
     branches: [master]
 

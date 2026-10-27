@@ -62,7 +62,7 @@ jobs:
         run: |
           python3 -m unittest discover -s tools/bazel -p go_validation_test.py -v
           python3 -B -m unittest discover -s tools/bazel/runtime -p prepare_test.py -v
-          python3 -B -m unittest discover -s tools/bazel/cache -p '*_test.py' -v
+          python3 -B -m unittest discover -s tools/bazel/cache -p '*test*.py' -v
 
       - name: Configure remote build cache
         run: bash tools/bazel/cache/configure.sh
