@@ -1,7 +1,7 @@
 # Keep bazel_compatibility in sync with sonic-buildimage's .bazelversion.
 module(
     name = "sonic-swss-common",
-    version = "0.0.6",
+    version = "0.0.8",
     bazel_compatibility = [
         ">=8.5.1",
         "<=8.5.1",
@@ -129,3 +129,5 @@ use_repo(
     boost_serialization_amd64 = "trixie_libboost-serialization1.83.0-amd64_1.83.0-4.2",
     boost_serialization_arm64 = "trixie_libboost-serialization1.83.0-arm64_1.83.0-4.2",
 )
+
+bazel_dep(name = "patchelf", version = "0.18.0.bcr.1")

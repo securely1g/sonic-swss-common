@@ -86,6 +86,7 @@ sh_test(
     name = "swsscommon_runtime_test",
     srcs = ["//tools/bazel/runtime:run_with_runtime.py"],
     args = [
+        "$(location @patchelf//:patchelf)",
         "$(location //tools/bazel/runtime:test_runtime)",
         "$(location //:libswsscommon_consolidated.so)",
     ] + select({
@@ -96,7 +97,9 @@ sh_test(
         ":swsscommon_runtime_test_binary",
         "//:libswsscommon_consolidated.so",
         "//tools/bazel/runtime:test_runtime",
+        "@patchelf",
     ],
+    env = {"GO_TEST_WRAP_TESTV": "1"},
 )
 
 go_test(
