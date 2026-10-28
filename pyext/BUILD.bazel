@@ -116,6 +116,7 @@ sh_test(
     srcs = ["swsscommon_package_test.py"],
     args = [
         "$(location //tools/bazel/runtime:run_with_runtime)",
+        "$(location @patchelf//:patchelf)",
         "$(location //tools/bazel/runtime:test_runtime)",
         "$(location :swsscommon_pkg)",
         "$(location :swsscommon_pkg.debug_symbols)",
@@ -128,6 +129,7 @@ sh_test(
         ":swsscommon_pkg.debug_symbols",
         "//tools/bazel/runtime:run_with_runtime",
         "//tools/bazel/runtime:test_runtime",
+        "@patchelf//:patchelf",
     ],
 )
 

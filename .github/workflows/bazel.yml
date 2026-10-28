@@ -118,7 +118,8 @@ jobs:
             --features=${{ matrix.feature }} \
             --execution_log_json_file=artifacts/validation/cgo-actions.json \
             --test_output=errors \
-            //goext/tests/hiredis:hiredis_cgo_test
+            //goext/tests/hiredis:hiredis_cgo_test \
+            //tools/bazel/runtime:declared_loader_test
       - name: Collect cgo header evidence
         if: always()
         run: |

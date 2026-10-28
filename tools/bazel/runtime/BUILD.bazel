@@ -1,5 +1,7 @@
+load("@rules_cc//cc:cc_binary.bzl", "cc_binary")
 load("@rules_distroless//distroless:defs.bzl", "flatten")
 load("@rules_shell//shell:sh_binary.bzl", "sh_binary")
+load("@rules_shell//shell:sh_test.bzl", "sh_test")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -26,4 +28,24 @@ sh_binary(
     name = "run_with_runtime",
     testonly = True,
     srcs = ["run_with_runtime.py"],
+)
+
+cc_binary(
+    name = "loader_probe",
+    testonly = True,
+    srcs = ["loader_probe.c"],
+)
+
+sh_test(
+    name = "declared_loader_test",
+    srcs = ["run_with_runtime.py"],
+    args = [
+        "$(location @patchelf//:patchelf)",
+        "$(location :test_runtime)",
+        "-",
+    ] + select({
+        "//tools/bazel:yang_modules_enabled": ["enabled"],
+        "//conditions:default": ["disabled"],
+    }) + ["$(location :loader_probe)"],
+    data = [":test_runtime", ":loader_probe", "@patchelf//:patchelf"],
 )

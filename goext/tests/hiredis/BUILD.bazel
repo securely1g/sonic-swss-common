@@ -21,8 +21,10 @@ go_test(
 
 sh_test(
     name = "hiredis_cgo_test",
+    env = {"GO_TEST_WRAP_TESTV": "1"},
     srcs = ["//tools/bazel/runtime:run_with_runtime.py"],
     args = [
+        "$(location @patchelf//:patchelf)",
         "$(location //tools/bazel/runtime:test_runtime)",
         "-",
     ] + select({
@@ -32,5 +34,6 @@ sh_test(
     data = [
         ":hiredis_cgo_test_binary",
         "//tools/bazel/runtime:test_runtime",
+        "@patchelf//:patchelf",
     ],
 )

@@ -106,7 +106,7 @@ def check_debug_symbols(install_root, symbols_archive):
 
 
 def main():
-    runner, runtime_archive, archive, symbols_archive, yang_mode = sys.argv[1:]
+    runner, patchelf, runtime_archive, archive, symbols_archive, yang_mode = sys.argv[1:]
     if yang_mode not in {"enabled", "disabled"}:
         raise ValueError(f"Unknown YANG mode: {yang_mode}")
 
@@ -130,7 +130,7 @@ def main():
         SWSS_YANG_MODE=yang_mode,
     )
     subprocess.run(
-        [runner, runtime_archive, "-", yang_mode, sys.executable, "-S", "-c", _CHECK_IMPORT],
+        [runner, patchelf, runtime_archive, "-", yang_mode, sys.executable, "-S", "-c", _CHECK_IMPORT],
         env=environment,
         check=True,
     )
