@@ -129,7 +129,7 @@ sh_test(
         ":swsscommon_pkg.debug_symbols",
         "//tools/bazel/runtime:run_with_runtime",
         "//tools/bazel/runtime:test_runtime",
-        "@patchelf//:patchelf",
+        "@patchelf",
     ],
 )
 
