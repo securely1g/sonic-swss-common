@@ -20,7 +20,7 @@ _APT_DEPS = [
     "@libnl3//:libnl_3",
     "@libnl3//:libnl_route_3",
     "@libnl3//:libnl_nf_3",
-    "@trixie//libzmq3-dev:libzmq3",
+    "@trixie//libzmq3-dev:libzmq_cc",
     "@trixie//uuid-dev:uuid",
     "@trixie//libboost-dev:libboost",
     "@trixie//libboost-serialization-dev:libboost-serialization",

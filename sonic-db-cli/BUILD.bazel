@@ -1,5 +1,6 @@
 load("@rules_cc//cc:cc_shared_library.bzl", "cc_shared_library")
 load("@rules_cc//cc:cc_test.bzl", "cc_test")
+load("@rules_shell//shell:sh_test.bzl", "sh_test")
 load("@sonic_build_infra//cc:shared_library.bzl", "shared_library_cc_info")
 load("//tools/bazel:cc.bzl", "swss_cc_binary", "swss_cc_library")
 load("//tools/bazel:flags.bzl", "CXXFLAGS_COMMON", "DBGFLAGS")
@@ -58,4 +59,24 @@ cc_test(
     srcs = ["shared_library_test.cpp"],
     linkstatic = False,
     deps = [":sonicdbcli_shared"],
+)
+
+# Run the same public-ABI probe on a host without the target distro libraries.
+# The declared Trixie loader and runtime must satisfy every ELF dependency.
+sh_test(
+    name = "declared_shared_library_test",
+    srcs = ["//tools/bazel/runtime:run_with_runtime.py"],
+    args = [
+        "$(location @patchelf//:patchelf)",
+        "$(location //tools/bazel/runtime:test_runtime)",
+        "-",
+    ] + select({
+        "//tools/bazel:yang_modules_enabled": ["enabled"],
+        "//conditions:default": ["disabled"],
+    }) + ["$(location :shared_library_test)"],
+    data = [
+        ":shared_library_test",
+        "//tools/bazel/runtime:test_runtime",
+        "@patchelf",
+    ],
 )

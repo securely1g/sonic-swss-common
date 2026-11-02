@@ -20,6 +20,11 @@ on:
 permissions:
   contents: read
 
+env:
+  # Draft dependency: registry #146 supplies the native per-library APT targets.
+  SONIC_BAZEL_REGISTRY_URL: https://raw.githubusercontent.com/securely1g/sonic-bazel-registry/codex/common-zmq-registry-base
+  SONIC_BAZEL_REGISTRY_REVISION: 6f277d4a12de1fa156a1e2566080e0bf23bc38ea
+
 jobs:
   native:
     name: Native (${{ inputs.arch }}, YANG ${{ matrix.yang }})
