@@ -4,7 +4,7 @@ run-name: Bazel validation
 on:
   workflow_dispatch:
   pull_request:
-    branches: [master]
+    branches: [master, codex/common-loader-base]
   push:
     branches: [master]
 
