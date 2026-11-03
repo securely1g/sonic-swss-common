@@ -4,7 +4,7 @@ run-name: Bazel validation
 on:
   workflow_dispatch:
   pull_request:
-    branches: [master, codex/common-loader-base]
+    branches: [master, codex/common-loader-base, codex/common-netlink-base]
   push:
     branches: [master]
 
@@ -12,9 +12,9 @@ permissions:
   contents: read
 
 env:
-  # Draft dependency: registry #146 supplies the native per-library APT targets.
-  SONIC_BAZEL_REGISTRY_URL: https://raw.githubusercontent.com/securely1g/sonic-bazel-registry/codex/common-zmq-registry-base
-  SONIC_BAZEL_REGISTRY_REVISION: 6f277d4a12de1fa156a1e2566080e0bf23bc38ea
+  # Draft dependency: registry #148 supplies native libnl targets; #179 supplies their test/runtime helpers.
+  SONIC_BAZEL_REGISTRY_URL: https://raw.githubusercontent.com/securely1g/sonic-bazel-registry/codex/common-netlink-registry-v2
+  SONIC_BAZEL_REGISTRY_REVISION: 4b46583e55dcb55007887a7c6a596d85f3cdd3ce
 
 jobs:
   native-amd64:
