@@ -2,13 +2,14 @@
 set -euo pipefail
 
 # Inspect archive headers directly so this check also works for cross builds.
-python3 - "$1" "$2" <<'PY'
+python3 - "$1" "$2" "$3" <<'PY'
 import re
 import sys
 import tarfile
 
 with tarfile.open(sys.argv[1]) as archive:
     members = archive.getmembers()
+    all_members = list(members)
     libraries = [member for member in members if re.fullmatch(
         r"usr/lib/(?:x86_64|aarch64)-linux-gnu/lib(?:swsscommon|sonicdbcli)\.so(?:\.0(?:\.0\.0)?)?",
         member.name,
@@ -25,6 +26,18 @@ with tarfile.open(sys.argv[1]) as archive:
 
 with tarfile.open(sys.argv[2]) as archive:
     required.append(archive.getmember("usr/bin/sonic-db-cli"))
+    all_members.extend(archive.getmembers())
+
+with tarfile.open(sys.argv[3]) as archive:
+    members = archive.getmembers()
+    required.extend(member for member in members if member.isfile() or member.issym())
+    all_members.extend(members)
+
+for member in all_members:
+    if (member.uid, member.gid) != (0, 0):
+        raise SystemExit(
+            f"{member.name}: expected root ownership, found {member.uid}:{member.gid}"
+        )
 
 for member in required:
     expected = 0 if member.issym() else 1672560000
@@ -32,5 +45,5 @@ for member in required:
         raise SystemExit(
             f"{member.name}: expected fixed timestamp {expected}, found {member.mtime}"
         )
-print("Explicit runtime package timestamps are deterministic")
+print("Runtime packages have root ownership and deterministic timestamps")
 PY

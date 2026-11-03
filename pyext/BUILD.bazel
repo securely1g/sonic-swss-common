@@ -99,14 +99,14 @@ sonic_deploy_tar(
     ],
     out = "swsscommon_pkg.tar.gz",
     binaries = {
-        "usr/lib/python3/dist-packages/swsscommon/lib_swsscommon.so type=file mode=0755": ":_swsscommon",
+        "usr/lib/python3/dist-packages/swsscommon/lib_swsscommon.so type=file uid=0 gid=0 mode=0755": ":_swsscommon",
     },
     compress = "gzip",
     force_debug_build = True,
     mtree = [
-        "usr/lib/python3/dist-packages/swsscommon/__init__.py type=file mode=0644 content=$(location :installed_init_py)",
-        "usr/lib/python3/dist-packages/swsscommon/swsscommon.py type=file mode=0644 content=$(location py3/swsscommon.py)",
-        "usr/lib/python3/dist-packages/swsscommon/_swsscommon.so type=link time=0 link=lib_swsscommon.so",
+        "usr/lib/python3/dist-packages/swsscommon/__init__.py type=file uid=0 gid=0 mode=0644 content=$(location :installed_init_py)",
+        "usr/lib/python3/dist-packages/swsscommon/swsscommon.py type=file uid=0 gid=0 mode=0644 content=$(location py3/swsscommon.py)",
+        "usr/lib/python3/dist-packages/swsscommon/_swsscommon.so type=link uid=0 gid=0 time=0 link=lib_swsscommon.so",
     ],
     visibility = ["//visibility:public"],
 )
