@@ -11,13 +11,14 @@ on:
     branches:
       - 'master'
       - 'codex/common-loader-base'
+      - 'codex/common-netlink-base'
       - '202[0-9][0-9][0-9]'
   workflow_dispatch:
 
 env:
-  # Draft dependency: registry #146 supplies the native per-library APT targets.
-  SONIC_BAZEL_REGISTRY_URL: https://raw.githubusercontent.com/securely1g/sonic-bazel-registry/codex/common-zmq-registry-base
-  SONIC_BAZEL_REGISTRY_REVISION: 6f277d4a12de1fa156a1e2566080e0bf23bc38ea
+  # Draft dependencies: libnl 3.7.0.sonic.7 supplies native SONAME paths; registry #179 supplies test/runtime helpers.
+  SONIC_BAZEL_REGISTRY_URL: https://raw.githubusercontent.com/securely1g/sonic-bazel-registry/codex/libnl-shared-soname
+  SONIC_BAZEL_REGISTRY_REVISION: 9bf63a7fd8220a8a376f9167c041c8cc0c35fcf2
 
 jobs:
   analyze:
@@ -91,6 +92,15 @@ jobs:
         python3 tools/bazel/go_validation.py record artifacts/codeql-go-inputs
         git rev-parse HEAD > artifacts/codeql-go-inputs/tested-revision.txt
 
+    - name: Prepare declared dependency tools before tracing
+      shell: bash
+      run: |
+        base="$(mktemp -d "$RUNNER_TEMP/codeql-bazel-output.XXXXXX")"
+        printf '%s\n' "$base" > artifacts/codeql-go-inputs/build-output-base.txt
+        printf 'COMMON_CODEQL_OUTPUT_BASE=%s\n' "$base" >> "$GITHUB_ENV"
+        export COMMON_CODEQL_OUTPUT_BASE="$base"
+        bash tools/bazel/codeql/build.sh prepare
+
     - name: Initialize CodeQL
       uses: github/codeql-action/init@ec3cf9c605b848da5f1e41e8452719eb1ccfb9a6 # v2.1.29
       with:
@@ -99,31 +109,9 @@ jobs:
         # Match the CLI used by the legacy job, which supports GCC 14.2.
         tools: https://github.com/github/codeql-action/releases/download/codeql-bundle-v2.27.0/codeql-bundle-linux64.tar.gz
 
-    - name: Build C++ with Bazel
+    - name: Build Common C++ under CodeQL tracing
       shell: bash
-      run: |
-        codeql_bazel_output_base="$(mktemp -d "$RUNNER_TEMP/codeql-bazel-output.XXXXXX")"
-        echo "$codeql_bazel_output_base" > artifacts/codeql-go-inputs/build-output-base.txt
-        trap 'bazel --output_base="$codeql_bazel_output_base" shutdown' EXIT
-        bazel --output_base="$codeql_bazel_output_base" build \
-          --lockfile_mode=update \
-          --//tools/bazel:yang_modules=True \
-          --spawn_strategy=local \
-          --nouse_action_cache \
-          --noremote_accept_cached \
-          --noremote_upload_local_results \
-          --disk_cache= \
-          --remote_cache= \
-          --remote_executor= \
-          --cxxopt=-nostdinc \
-          //:libswsscommon \
-          //:swssloglevel \
-          //sonic-db-cli:sonic-db-cli \
-          //pyext:_swsscommon \
-          //tests:codeql_test_sources \
-          //tests:shared_library_runtime_test
-        test ! -e Cargo.Bazel.lock
-        git diff --exit-code HEAD -- Cargo.lock
+      run: bash tools/bazel/codeql/build.sh trace
 
     - name: Upload Rust dependency evidence
       if: always()

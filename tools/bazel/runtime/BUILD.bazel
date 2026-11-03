@@ -13,6 +13,9 @@ flatten(
     testonly = True,
     deduplicate = True,
     tars = [
+        "@libnl3//:libnl-3_pkg",
+        "@libnl3//:libnl-route-3_pkg",
+        "@libnl3//:libnl-nf-3_pkg",
         "@trixie//libboost-serialization-dev",
         "@trixie//libhiredis-dev",
         "@trixie//libzmq3-dev",

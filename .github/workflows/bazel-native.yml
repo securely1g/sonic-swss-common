@@ -21,9 +21,9 @@ permissions:
   contents: read
 
 env:
-  # Draft dependency: registry #146 supplies the native per-library APT targets.
-  SONIC_BAZEL_REGISTRY_URL: https://raw.githubusercontent.com/securely1g/sonic-bazel-registry/codex/common-zmq-registry-base
-  SONIC_BAZEL_REGISTRY_REVISION: 6f277d4a12de1fa156a1e2566080e0bf23bc38ea
+  # Draft dependencies: libnl 3.7.0.sonic.7 supplies native SONAME paths; registry #179 supplies test/runtime helpers.
+  SONIC_BAZEL_REGISTRY_URL: https://raw.githubusercontent.com/securely1g/sonic-bazel-registry/codex/libnl-shared-soname
+  SONIC_BAZEL_REGISTRY_REVISION: 9bf63a7fd8220a8a376f9167c041c8cc0c35fcf2
 
 jobs:
   native:
@@ -181,6 +181,10 @@ jobs:
           //tests:vrf_ut
           //tests:shared_library_runtime_test
           //tests:shared_library_elf_test
+          //tests/shared_netlink:consumer_test
+          @libnl3//:libnl-3_pkg
+          @libnl3//:libnl-route-3_pkg
+          @libnl3//:libnl-nf-3_pkg
           //sonic-db-cli:shared_library_test
           //tests:defaultvalueprovider_ut
           //dist:libswsscommon_package_test
@@ -265,6 +269,10 @@ jobs:
           //tests:vrf_ut
           //tests:shared_library_runtime_test
           //tests:shared_library_elf_test
+          //tests/shared_netlink:consumer_test
+          @libnl3//:libnl-3_pkg
+          @libnl3//:libnl-route-3_pkg
+          @libnl3//:libnl-nf-3_pkg
           //sonic-db-cli:shared_library_test
           //dist:libswsscommon_package_test
           //dist:package_timestamps_test
@@ -319,13 +327,31 @@ jobs:
             fi
             installed_runtime_args+=(--libyang-package "$libyang_runtime_archive")
           fi
+          for package in libnl-3 libnl-route-3 libnl-nf-3; do
+            archive="$(bazel cquery ${{ inputs.bazel_args }} \
+              --test_env=SWSS_EXPECT_RUNPATH=1 --test_env=SONIC_TEST_RUNTIME_ID \
+              --//tools/bazel:yang_modules=${{ matrix.yang == 'enabled' && 'True' || 'False' }} \
+              --output=files "config(@libnl3//:${package}_pkg, target)")"
+            test -f "$archive"
+            installed_runtime_args+=(--libnl-package "$archive")
+          done
           python3 -B tools/bazel/runtime/installed_check.py \
             --common-package bazel-bin/dist/libswsscommon_pkg.tar \
             --cli-package bazel-bin/dist/sonic-db-cli_pkg.tar \
             --common-probe bazel-bin/tests/shared_library_runtime_test \
             --cli-probe bazel-bin/sonic-db-cli/shared_library_test \
+            --netlink-probe bazel-bin/tests/shared_netlink/consumer \
             --output artifacts/validation/installed-runtime.json \
             "${installed_runtime_args[@]}"
+
+      - name: Retain shared netlink consumer results
+        if: always()
+        run: |
+          mkdir -p artifacts/validation/shared-netlink
+          for file in test.log test.xml; do
+            source="bazel-testlogs/tests/shared_netlink/consumer_test/$file"
+            test ! -f "$source" || cp -L "$source" artifacts/validation/shared-netlink/
+          done
 
       - name: Upload YANG package artifacts
         if: matrix.yang == 'enabled'
