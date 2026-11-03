@@ -13,6 +13,8 @@ import subprocess
 import tempfile
 import time
 
+import policy
+
 
 ROOT = Path(__file__).resolve().parents[3]
 TARGETS = ["//:libswsscommon_shared", "//:libswsscommon_consolidated.so"]
@@ -101,15 +103,20 @@ def command(args, log):
 
 
 def build_phase(name, temporary, config):
+    seed = name == "seed"
+    if seed:
+        policy.require_upload_allowed()
     output_base = temporary / (name + "-output")
     if output_base.exists():
         raise ValueError("The validation output base must be new")
     # The disposable job container does not necessarily reap orphaned servers.
     # Batch mode keeps each Bazel JVM attached to its invoking process, so an
     # unrelated shutdown failure cannot mask the cache-validation result.
-    prefix = ["bazel", "--batch", "--output_base=" + str(output_base)]
-    seed = name == "seed"
+    # A master user's RC can select the writer helper; readback must stay anonymous.
+    prefix = ["bazel", "--batch", "--nosystem_rc", "--nohome_rc",
+              "--output_base=" + str(output_base)]
     flags = ["--config=ci-remote-cache", "--config=ci-linux-sandbox", *config,
+             *(["--config=ci-remote-cache-write"] if seed else []),
              "--lockfile_mode=update", "--//tools/bazel:yang_modules=False",
              "--disk_cache=", "--remote_executor=", "--remote_download_outputs=all",
              "--remote_cache_async=false", "--color=no", "--curses=no",
@@ -152,6 +159,7 @@ def main():
                "yang": False, "passed": False, "phases": []}
     args.output.parent.mkdir(parents=True, exist_ok=True)
     try:
+        policy.require_upload_allowed()
         if not os.environ.get("BAZEL_REMOTE_AUTH"):
             raise ValueError("Remote cache validation requires CI credentials")
         # Raw action records can contain environment values. Keep them private and

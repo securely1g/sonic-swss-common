@@ -30,7 +30,7 @@ jobs:
         yang: [enabled, disabled]
     runs-on: ${{ inputs.runner }}
     env:
-      BAZEL_REMOTE_AUTH: ${{ secrets.BAZEL_REMOTE_AUTH }}
+      BAZEL_REMOTE_AUTH: ${{ github.ref == 'refs/heads/master' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && secrets.BAZEL_REMOTE_AUTH || '' }}
     container:
       image: debian:trixie-20260918
       # Allow Bazel to create nested namespaces and mount its read-only root.

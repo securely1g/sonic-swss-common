@@ -9,6 +9,7 @@ permissions:
 jobs:
   cache:
     name: Remote cache (${{ matrix.arch }})
+    if: github.ref == 'refs/heads/master'
     timeout-minutes: 40
     strategy:
       fail-fast: false

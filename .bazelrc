@@ -30,8 +30,8 @@ test --test_env=SWSS_EXPECT_RUNPATH=1
 # Materialize cached kernel tool files through their original directory aliases.
 build --remote_download_regex=(^|.*/)tools/build_tools/kernel_runtime_(amd64|arm64)(/.*)?$
 
-# CI opts in only when its repository secret is available. The helper reads
-# credentials from the client environment, never from archived Bazel options.
-common:ci-remote-cache --credential_helper=lgh-bazel-87263989.eastus.cloudapp.azure.com=%workspace%/tools/bazel/cache/credentials.py
+# PRs read anonymously. Only master writers select the credential helper.
 build:ci-remote-cache --remote_cache=https://lgh-bazel-87263989.eastus.cloudapp.azure.com/
 build:ci-remote-cache --remote_upload_local_results=false
+common:ci-remote-cache-write --credential_helper=lgh-bazel-87263989.eastus.cloudapp.azure.com=%workspace%/tools/bazel/cache/credentials.py
+build:ci-remote-cache-write --remote_upload_local_results=true
