@@ -360,8 +360,29 @@ bazel test //crates/swss-common:swss_common_test \
 ```
 
 Add `--config=aarch64` on native ARM64. CI runs the library and unit tests on
-native AMD64 and ARM64 in both YANG modes. Redis-backed Cargo integration tests
-and the optional async feature are outside this Bazel test target.
+native AMD64 and ARM64 in both YANG modes. Redis-backed Cargo integration tests remain outside these standalone library tests.
+
+Consumers that enable Cargo's `async` feature, such as DASH HA's `swbus-actor`
+and `swss-common-bridge`, use `//crates/swss-common:swss_common_async`. Common
+builds this variant from the same sources and bindings, with the shared Tokio
+dependency. It retains the default target for consumers without that feature.
+
+The existing test-helper crate has two public targets:
+
+- `//crates/swss-common-testing:swss_common_testing` uses the default Common library.
+- `//crates/swss-common-testing:swss_common_testing_async` uses the async Common library.
+
+Select the matching pair: Rust types from separately compiled Common variants
+are distinct. Consumers must not compile another copy of Common or its testing
+crate. Both variants reuse `sonic-rust-deps` for their third-party dependencies.
+
+`//tools/bazel/rust:testing_interface_test` and
+`//tools/bazel/rust:async_testing_interface_test` verify the shared public types
+and Serde traits. The async test also executes Common's blocking-task adapter
+with the shared Tokio runtime, using an invalid socket string so it needs no
+host Redis server. `//crates/swss-common:swss_common_async_test` runs the existing
+Common unit tests with async enabled. CI runs and retains all these results in
+both existing YANG modes.
 
 Bazel consumers depend on `@sonic-swss-common//crates/swss-common:swss_common`.
 Common and SWSS both use `@sonic_rust_deps//:serde` and
@@ -556,50 +577,30 @@ on the GitHub runner when a matching result is unavailable. The existing
 repository and GitHub disk caches remain enabled, and `--nocache_test_results`
 keeps the declared tests executing on each run.
 
-PR builds read the cache anonymously, including fork and Dependabot builds.
-The read-only `ci-remote-cache` configuration has no credential helper, and its
-probe sends no Authorization header even if credentials are present in the
-environment. The cache service must allow anonymous reads.
-
-For master writers, configure the repository Actions secret `BAZEL_REMOTE_AUTH`
-with the complete HTTP authorization value: `Basic ` followed by the base64 encoding of
-`username:password`. The top-level workflow passes this secret to the reusable
-native workflow only for allowed master builds. The writer configuration
-`ci-remote-cache-write` adds the credential helper, which reads it from the Bazel
+Configure the repository Actions secret `BAZEL_REMOTE_AUTH` with the complete
+HTTP authorization value: `Basic ` followed by the base64 encoding of
+`username:password`. The top-level workflow passes this secret explicitly to
+the reusable native workflow. The credential helper reads it from the Bazel
 client environment and serves only this cache's HTTPS endpoint. Credentials
 must not be placed in `.bazelrc`, URLs or command arguments: CI retains Bazel
 configuration and resolution evidence as artifacts.
 
-The setup step verifies read access before enabling the cache.
-Uploads are enabled only when `GITHUB_ACTIONS=true`, `GITHUB_REF=refs/heads/master`,
-the event is `push` or `workflow_dispatch`, and writer credentials are available.
-PR builds, manual builds from other branches, tags, and local invocations remain
-anonymous and read-only. Master builds without the secret also use anonymous reads.
-The cache-access receipt records the effective upload boolean and GitHub event
-and ref alongside the read result and whether it was authenticated; it contains
-no credentials.
-
-These flags control client behavior, not server permissions. The cache service
-must allow anonymous GET/HEAD requests while requiring writer credentials for
-uploads. The current workflow passes its repository secret only to allowed
-master builds. This condition does not prevent same-repository PR code from
-deliberately referencing that secret and issuing uploads directly. For an enforced
-boundary, store writer credentials in a protected GitHub environment restricted
-to master deployments. The read probe does not establish server write permissions.
+The setup step verifies authenticated access before enabling the cache. PR
+builds read cached results; pushes to `master` and manually dispatched builds
+also upload new results. Fork and Dependabot runs without the secret retain
+the ordinary build path. These upload flags control client behavior; access
+permissions are also governed by the server credential.
 
 The **Bazel remote cache validation** workflow runs only when manually dispatched
-from `master` using its **Run workflow** button in GitHub Actions. The seed scripts
-also reject invocations outside the master push/manual CI policy before building.
-The workflow checks both native
+from its **Run workflow** button in GitHub Actions. It checks both native
 architectures and deliberately uploads validation outputs: it builds Common's
 shared library in a fresh output base, then reads it from the remote cache using a
 second fresh output base with uploads and the disk cache disabled. The receipt
 requires remote hits for Common compilation and linking and matching output
 hashes. Only sanitized receipts are uploaded; raw execution logs stay outside
 the artifacts directory. This distinguishes remote reuse from local disk reuse.
-Normal native CI reads the remote cache anonymously by default; writer credentials
-enable uploads for allowed master builds. It does not run this separate
-cache-reuse proof on every PR.
+Normal native CI continues to use the remote cache automatically when credentials
+are available; it does not run this separate cache-reuse proof on every PR.
 
 ## CodeQL C++ build
 

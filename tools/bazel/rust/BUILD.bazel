@@ -20,3 +20,31 @@ rust_test(
         "@sonic_rust_deps//:serde_core",
     ],
 )
+
+rust_test(
+    name = "testing_interface_test",
+    srcs = ["testing_interface_test.rs"],
+    crate_root = "testing_interface_test.rs",
+    edition = "2021",
+    experimental_use_cc_common_link = 1,
+    deps = [
+        "//crates/swss-common:swss_common",
+        "//crates/swss-common-testing:swss_common_testing",
+        "@sonic_rust_deps//:serde",
+    ],
+)
+
+rust_test(
+    name = "async_testing_interface_test",
+    srcs = ["testing_interface_test.rs"],
+    crate_features = ["async"],
+    crate_root = "testing_interface_test.rs",
+    edition = "2021",
+    experimental_use_cc_common_link = 1,
+    deps = [
+        "//crates/swss-common:swss_common_async",
+        "//crates/swss-common-testing:swss_common_testing_async",
+        "@sonic_rust_deps//:serde",
+        "@sonic_rust_deps//:tokio",
+    ],
+)
