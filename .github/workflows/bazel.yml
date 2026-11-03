@@ -4,7 +4,7 @@ run-name: Bazel validation
 on:
   workflow_dispatch:
   pull_request:
-    branches: [master, codex/common-loader-base, codex/common-netlink-base]
+    branches: [master, codex/common-loader-base, codex/common-netlink-base, codex/native-netlink-shared]
   push:
     branches: [master]
 
@@ -12,9 +12,9 @@ permissions:
   contents: read
 
 env:
-  # Draft dependencies: libnl 3.7.0.sonic.7 supplies native SONAME paths; registry #179 supplies test/runtime helpers.
-  SONIC_BAZEL_REGISTRY_URL: https://raw.githubusercontent.com/securely1g/sonic-bazel-registry/codex/libnl-shared-soname
-  SONIC_BAZEL_REGISTRY_REVISION: 9bf63a7fd8220a8a376f9167c041c8cc0c35fcf2
+  # Draft dependencies: native libnl .7 and the current infrastructure candidate from registry #195.
+  SONIC_BAZEL_REGISTRY_URL: https://raw.githubusercontent.com/securely1g/sonic-bazel-registry/codex/common-async-validation
+  SONIC_BAZEL_REGISTRY_REVISION: 635aafbb7bc3df3860f83c26a86e6cf925436eac
 
 jobs:
   native-amd64:

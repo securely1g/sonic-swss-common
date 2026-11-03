@@ -360,8 +360,29 @@ bazel test //crates/swss-common:swss_common_test \
 ```
 
 Add `--config=aarch64` on native ARM64. CI runs the library and unit tests on
-native AMD64 and ARM64 in both YANG modes. Redis-backed Cargo integration tests
-and the optional async feature are outside this Bazel test target.
+native AMD64 and ARM64 in both YANG modes. Redis-backed Cargo integration tests remain outside these standalone library tests.
+
+Consumers that enable Cargo's `async` feature, such as DASH HA's `swbus-actor`
+and `swss-common-bridge`, use `//crates/swss-common:swss_common_async`. Common
+builds this variant from the same sources and bindings, with the shared Tokio
+dependency. It retains the default target for consumers without that feature.
+
+The existing test-helper crate has two public targets:
+
+- `//crates/swss-common-testing:swss_common_testing` uses the default Common library.
+- `//crates/swss-common-testing:swss_common_testing_async` uses the async Common library.
+
+Select the matching pair: Rust types from separately compiled Common variants
+are distinct. Consumers must not compile another copy of Common or its testing
+crate. Both variants reuse `sonic-rust-deps` for their third-party dependencies.
+
+`//tools/bazel/rust:testing_interface_test` and
+`//tools/bazel/rust:async_testing_interface_test` verify the shared public types
+and Serde traits. The async test also executes Common's blocking-task adapter
+with the shared Tokio runtime, using an invalid socket string so it needs no
+host Redis server. `//crates/swss-common:swss_common_async_test` runs the existing
+Common unit tests with async enabled. CI runs and retains all these results in
+both existing YANG modes.
 
 Bazel consumers depend on `@sonic-swss-common//crates/swss-common:swss_common`.
 Common and SWSS both use `@sonic_rust_deps//:serde` and

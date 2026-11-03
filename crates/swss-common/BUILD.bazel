@@ -51,6 +51,37 @@ rust_library(
     ],
 )
 
+# Cargo consumers enabling `async` use this variant and a matching testing
+# library. Both variants share the same bindings and third-party crate owners.
+rust_library(
+    name = "swss_common_async",
+    srcs = glob(["src/**/*.rs"]),
+    compile_data = [":bindings_dir"],
+    crate_features = ["async"],
+    crate_name = "swss_common",
+    crate_root = "src/lib.rs",
+    edition = "2021",
+    link_deps = ["//:libswsscommon_shared"],
+    rustc_env = {"OUT_DIR": "$(execpath :bindings_dir)"},
+    rustc_flags = ["-Cdebuginfo=2"],
+    version = "0.1.0",
+    visibility = ["//visibility:public"],
+    deps = [
+        "@sonic_rust_deps//:getset",
+        "@sonic_rust_deps//:lazy_static",
+        "@sonic_rust_deps//:libc",
+        "@sonic_rust_deps//:serde",
+        "@sonic_rust_deps//:tokio",
+        "@sonic_rust_deps//:tracing-subscriber",
+    ],
+)
+
+rust_test(
+    name = "swss_common_async_test",
+    crate = ":swss_common_async",
+    experimental_use_cc_common_link = 1,
+)
+
 rust_test(
     name = "swss_common_test",
     crate = ":swss_common",
