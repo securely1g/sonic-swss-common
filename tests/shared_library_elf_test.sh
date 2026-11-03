@@ -34,6 +34,20 @@ if [[ "${common_dynamic}" != *"Shared library: [libboost_serialization.so.1.83.0
 fi
 
 common_symbols="$(nm --dynamic --defined-only --format=posix "${common_library}" | awk '{print $1}')"
+# These are runtime dependencies in Make too. Embedding their static libraries
+# breaks a consumer that links both Common and libnl's native shared targets.
+for library in libnl-3.so.200 libnl-route-3.so.200; do
+    if [[ "${common_dynamic}" != *"Shared library: [${library}]"* ]]; then
+        echo "${common_library}: missing shared dependency ${library}" >&2
+        exit 1
+    fi
+done
+for symbol in nl_socket_alloc rtnl_link_alloc nfnl_ct_alloc; do
+    if grep --extended-regexp --quiet "^${symbol}(@.*)?$" <<< "${common_symbols}"; then
+        echo "${common_library}: must not embed libnl symbol ${symbol}" >&2
+        exit 1
+    fi
+done
 # Cover independent C API implementation files, including APIs unused by the
 # small runtime test. The shared library must export them for other consumers.
 for symbol in \
