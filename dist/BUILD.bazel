@@ -171,7 +171,7 @@ sh_test(
 sonic_deploy_tar(
     name = "sonic-db-cli_pkg",
     out = "sonic-db-cli_pkg.tar",
-    binaries = {"usr/bin/sonic-db-cli type=file mode=0755": "//sonic-db-cli:sonic-db-cli"},
+    binaries = {"usr/bin/sonic-db-cli type=file uid=0 gid=0 mode=0755": "//sonic-db-cli:sonic-db-cli"},
     force_debug_build = True,
     visibility = ["//visibility:public"],
 )
@@ -182,9 +182,11 @@ sh_test(
     args = [
         "$(location :libswsscommon_pkg)",
         "$(location :sonic-db-cli_pkg)",
+        "$(location //pyext:swsscommon_pkg)",
     ],
     data = [
         ":libswsscommon_pkg",
         ":sonic-db-cli_pkg",
+        "//pyext:swsscommon_pkg",
     ],
 )
