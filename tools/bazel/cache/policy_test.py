@@ -60,7 +60,7 @@ class PolicyTests(TestCase):
                 self.assertEqual(result.stdout, expected)
                 self.assertEqual(result.stderr, "")
 
-    def configure(self, context, auth=AUTH, probe_status=0):
+    def configure(self, context, auth=AUTH, probe_status=0, probe_receipt=None):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             cache = root / "tools/bazel/cache"
@@ -75,6 +75,9 @@ class PolicyTests(TestCase):
                 "parser.add_argument('--output', required=True)\n"
                 "args = parser.parse_args()\n"
                 "Path('probe-called').write_text(json.dumps({'anonymous': args.anonymous}))\n"
+                f"probe_receipt = {probe_receipt!r}\n"
+                "if probe_receipt is not None:\n"
+                "    Path(args.output).write_text(json.dumps(probe_receipt))\n"
                 f"status = {probe_status!r}\n"
                 "if status: raise SystemExit(status)\n"
                 "Path(args.output).write_text(json.dumps({'authenticated': not args.anonymous, 'status': 200}))\n"
@@ -140,6 +143,49 @@ class PolicyTests(TestCase):
             self.assertEqual(rc, "build --jobs=2\n")
             self.assertIsNone(receipt)
             self.assertNotIn(AUTH, result.stdout + result.stderr)
+
+    def test_transport_failure_falls_back_to_local_cache_while_auth_or_redirect_fails(self):
+        for error_receipt in (
+            {"authenticated": False, "endpoint": "https://cache.example", "error_type": "URLError"},
+            {"authenticated": False, "endpoint": "https://cache.example", "error_type": "TimeoutError"},
+            {"authenticated": False, "endpoint": "https://cache.example", "error_type": "HTTPError", "status": 503},
+        ):
+            for context in (MASTER_PUSH, {**MASTER_PUSH, "GITHUB_EVENT_NAME": "pull_request"}):
+                with self.subTest(error_receipt=error_receipt, event=context["GITHUB_EVENT_NAME"]):
+                    result, rc, probed, receipt = self.configure(
+                        context, probe_status=1, probe_receipt=error_receipt)
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    self.assertIsNotNone(probed)
+                    self.assertEqual(rc, "build --jobs=2\n")
+                    self.assertEqual(
+                        receipt,
+                        {
+                            **error_receipt,
+                            "enabled": False,
+                            "mode": "local_only",
+                            "upload_local_results": False,
+                            "github_event_name": context["GITHUB_EVENT_NAME"],
+                            "github_ref": context["GITHUB_REF"],
+                        },
+                    )
+                    self.assertIn("falling back to local cache", result.stdout)
+                    for secret in (AUTH, AUTH[6:], "private-test-password"):
+                        self.assertNotIn(secret, result.stdout + result.stderr + rc + json.dumps(receipt))
+
+        for fatal_receipt in (
+            {"authenticated": False, "endpoint": "https://cache.example", "error_type": "ValueError"},
+            {"authenticated": False, "endpoint": "https://cache.example", "error_type": "HTTPError", "status": 401},
+            {"authenticated": False, "endpoint": "https://cache.example", "error_type": "HTTPError", "status": 403},
+            {"authenticated": False, "endpoint": "https://cache.example", "error_type": "HTTPError", "status": 302},
+        ):
+            with self.subTest(fatal_receipt=fatal_receipt):
+                result, rc, probed, receipt = self.configure(
+                    MASTER_PUSH, probe_status=1, probe_receipt=fatal_receipt)
+                self.assertEqual(result.returncode, 1)
+                self.assertIsNotNone(probed)
+                self.assertEqual(rc, "build --jobs=2\n")
+                self.assertEqual(receipt, fatal_receipt)
+                self.assertNotIn(AUTH, result.stdout + result.stderr)
 
 
 if __name__ == "__main__":
