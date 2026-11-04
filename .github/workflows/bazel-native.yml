@@ -155,6 +155,7 @@ jobs:
           //pyext:swsscommon_pkg.debug_symbols
           //goext:swsscommon
           //goext:swsscommon_runtime_test
+          //tools/bazel/runtime:declared_loader_test
           //tests:status_code_util_test
           //tests:saiaclschema_ut
           //tests:notification_queue_ut
@@ -237,6 +238,7 @@ jobs:
           //pyext:swsscommon_pkg.debug_symbols
           //goext:swsscommon
           //goext:swsscommon_runtime_test
+          //tools/bazel/runtime:declared_loader_test
           //tests:status_code_util_test
           //tests:saiaclschema_ut
           //tests:notification_queue_ut
