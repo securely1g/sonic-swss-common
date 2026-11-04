@@ -69,6 +69,9 @@ go_library(
     cgo = True,
     clinkopts = ["-fuse-ld=bfd"],
     importpath = "github.com/sonic-net/sonic-swss-common/goext",
+    # gNMI's native Make path generates this same owner interface locally.
+    # Bazel consumers use this archive through either spelling.
+    importpath_aliases = ["github.com/sonic-net/sonic-gnmi/swsscommon"],
     visibility = ["//visibility:public"],
 )
 
