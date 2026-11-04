@@ -60,7 +60,7 @@ class PolicyTests(TestCase):
                 self.assertEqual(result.stdout, expected)
                 self.assertEqual(result.stderr, "")
 
-    def configure(self, context, auth=AUTH, probe_status=0):
+    def configure(self, context, auth=AUTH, probe_status=0, probe_receipt=None):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             cache = root / "tools/bazel/cache"
@@ -76,6 +76,8 @@ class PolicyTests(TestCase):
                 "args = parser.parse_args()\n"
                 "Path('probe-called').write_text(json.dumps({'anonymous': args.anonymous}))\n"
                 f"status = {probe_status!r}\n"
+                f"failure = {probe_receipt!r}\n"
+                "if status and failure is not None: Path(args.output).write_text(json.dumps(failure))\n"
                 "if status: raise SystemExit(status)\n"
                 "Path(args.output).write_text(json.dumps({'authenticated': not args.anonymous, 'status': 200}))\n"
             )
@@ -140,6 +142,49 @@ class PolicyTests(TestCase):
             self.assertEqual(rc, "build --jobs=2\n")
             self.assertIsNone(receipt)
             self.assertNotIn(AUTH, result.stdout + result.stderr)
+
+
+    def test_unreachable_cache_is_skipped_only_for_read_only_runs(self):
+        unreachable = {"endpoint": "https://cache.invalid", "authenticated": False,
+                       "error_type": "URLError"}
+        for context, auth in ((MASTER_PUSH, None), (MASTER_PUSH, ""),
+                              ({**MASTER_PUSH, "GITHUB_EVENT_NAME": "pull_request",
+                                "GITHUB_REF": "refs/pull/35/merge"}, AUTH)):
+            with self.subTest(context=context, auth_present=bool(auth)):
+                result, rc, probed, receipt = self.configure(
+                    context, auth=auth, probe_status=1, probe_receipt=unreachable)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(probed, {"anonymous": True})
+                self.assertEqual(rc, "build --jobs=2\n")
+                self.assertEqual(receipt, {**unreachable, "remote_cache_enabled": False,
+                                           "upload_local_results": False,
+                                           "github_event_name": context["GITHUB_EVENT_NAME"],
+                                           "github_ref": context["GITHUB_REF"]})
+                self.assertIn("continuing this read-only run without it", result.stdout)
+                self.assertNotIn(AUTH, result.stdout + result.stderr + rc)
+
+    def test_unreachable_cache_still_fails_uploads(self):
+        unreachable = {"endpoint": "https://cache.invalid", "authenticated": False,
+                       "error_type": "URLError"}
+        result, rc, probed, receipt = self.configure(
+            MASTER_PUSH, probe_status=1, probe_receipt=unreachable)
+        self.assertEqual(result.returncode, 1)
+        self.assertEqual(probed, {"anonymous": False})
+        self.assertEqual(rc, "build --jobs=2\n")
+        self.assertEqual(receipt, unreachable)
+
+    def test_http_errors_still_fail_read_only_runs(self):
+        for failure in ({"endpoint": "https://cache.invalid", "authenticated": False,
+                         "error_type": "HTTPError", "status": 503},
+                        {"endpoint": "https://cache.invalid", "authenticated": False,
+                         "error_type": "ValueError"}):
+            with self.subTest(failure=failure):
+                result, rc, probed, receipt = self.configure(
+                    {**MASTER_PUSH, "GITHUB_EVENT_NAME": "pull_request"},
+                    probe_status=1, probe_receipt=failure)
+                self.assertEqual(result.returncode, 1)
+                self.assertEqual(rc, "build --jobs=2\n")
+                self.assertEqual(receipt, failure)
 
 
 if __name__ == "__main__":
