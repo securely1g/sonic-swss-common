@@ -40,3 +40,19 @@ packaging.
 
 Runtime library symlinks explicitly use mode `0777`, preserving the metadata
 expected when the same producer package is installed in a parent OCI layer.
+
+## Shared netlink dependencies
+
+Common links the three native shared targets owned by `libnl3` and declares
+`@libnl3//:runtime_packages.json` as source package metadata. Consumers such as
+Linkmgrd can link Common and libnl together without embedding another copy of
+libnl in Common. Images must include the corresponding libnl runtime TARs;
+Common's TAR does not absorb another owner's files.
+
+`//tests/shared_netlink:consumer_test` links the original shared providers and
+executes Common's C API plus base, route and netfilter libnl APIs. The existing
+ELF test checks Common's base/route dependencies and rejects embedded libnl
+symbols. Native CI preserves both architectures and YANG modes, and its
+installed check verifies that the loaded Common, CLI and libnl files match the
+built TARs without library-path overrides. This does not build DEBs or establish
+complete Linkmgrd/container acceptance.

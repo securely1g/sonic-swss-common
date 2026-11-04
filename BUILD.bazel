@@ -64,6 +64,13 @@ cc_library(
 # it away from the runtime paths calculated when Bazel linked it.
 cc_shared_library(
     name = "libswsscommon_consolidated.so",
+    # Consumers such as Linkmgrd also use libnl's public shared targets. Keep
+    # their ownership instead of embedding a second copy of libnl in Common.
+    dynamic_deps = [
+        "@libnl3//:libnl_3_shared",
+        "@libnl3//:libnl_route_3_shared",
+        "@libnl3//:libnl_nf_3_shared",
+    ],
     shared_lib_name = "libswsscommon.so.0",
     user_link_flags = [
         # Allow undefined symbols from external runtime deps (hiredis, zmq, etc.)
@@ -169,7 +176,7 @@ runtime_packages(
     changelog = "debian/changelog",
     control = "debian/control",
     debian_files = {"compat": "debian/compat"},
-    dependencies = select({
+    dependencies = ["@libnl3//:runtime_packages.json"] + select({
         "//tools/bazel:yang_modules_enabled": ["@libyang//:runtime_packages.json"],
         "//conditions:default": [],
     }),
