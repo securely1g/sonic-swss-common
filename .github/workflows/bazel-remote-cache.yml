@@ -14,7 +14,7 @@ jobs:
     timeout-minutes: 90
     env:
       SONIC_BAZEL_MANAGED_CACHE: "1"
-      BUILDIMAGE_REVISION: cecfa330f08744212a97cffa090b70c1ab2975c3
+      BUILDIMAGE_REVISION: 1d03ae229b066b02ed92751a7e539b4254bfdd95
     defaults:
       run:
         shell: bash

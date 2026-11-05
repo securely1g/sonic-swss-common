@@ -34,8 +34,16 @@ bazel_dep(
     version = "0.0.4-6d9c70f708d7420e9e2b2cdc906b80cee6b140f1",
     repo_name = "sonic_rust_deps",
 )
+# FIPS selects the same LLVM tooling dependency and aspect_bazel_lib version
+# that participate in buildimage's resolved graph, even for Common targets.
+bazel_dep(
+    name = "sonic-fips",
+    version = "0.0.4-ef423363e8fd50358f0aa2a8a20d3e08d4450a56",
+    repo_name = "sonic_fips",
+)
 bazel_dep(name = "googletest", version = "1.16.0")
 bazel_dep(name = "rules_cc", version = "0.2.20")
+bazel_dep(name = "rules_foreign_cc", version = "0.16.0.sonic.1")
 bazel_dep(name = "rules_python", version = "1.9.0")
 bazel_dep(name = "rules_rs", version = "0.1.0")
 bazel_dep(name = "rules_shell", version = "0.8.0")
