@@ -507,8 +507,11 @@ class ManagedSeedTest(TestCase):
         self.assertTrue(cross_repo.compare_resolution(seed, image)["matched"])
         changed = deepcopy(image)
         changed["dependencies"][0]["dependencies"][0]["key"] = "rules_cc@0.2.21"
-        with self.assertRaisesRegex(ValueError, "resolution differs"):
+        with self.assertRaisesRegex(cross_repo.ResolutionMismatch, "resolution differs") as error:
             cross_repo.compare_resolution(seed, changed)
+        self.assertFalse(error.exception.evidence["matched"])
+        self.assertEqual(error.exception.evidence["differences"][0]["buildimage_candidates"],
+                         {"rules_cc@0.2.21": []})
         incomplete = deepcopy(seed)
         incomplete["dependencies"][0]["dependencies"][0]["unexpanded"] = True
         with self.assertRaisesRegex(ValueError, "Incomplete"):

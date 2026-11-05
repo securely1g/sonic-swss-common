@@ -141,15 +141,32 @@ def graph_modules(graph):
     return {key: sorted(value) for key, value in modules.items() if key != "<root>"}
 
 
+class ResolutionMismatch(ValueError):
+    def __init__(self, evidence):
+        self.evidence = evidence
+        changed = [item["seed_module"] for item in evidence["differences"]]
+        super().__init__("Seed module resolution differs from buildimage: " + ", ".join(changed[:20]))
+
+
 def compare_resolution(seed_graph, image_graph):
     seed, image = graph_modules(seed_graph), graph_modules(image_graph)
-    changed = [key for key, dependencies in seed.items() if image.get(key) != dependencies]
+    changed = sorted(key for key, dependencies in seed.items() if image.get(key) != dependencies)
     common = [key for key in seed if key.startswith("sonic-swss-common@")]
-    if not seed or len(common) != 1 or changed:
-        raise ValueError("Seed module resolution differs from buildimage: " + ", ".join(sorted(changed)[:20]))
     encoded = json.dumps(seed, sort_keys=True, separators=(",", ":")).encode()
-    return {"matched": True, "seed_module_count": len(seed), "buildimage_module_count": len(image),
-            "shared_graph_sha256": hashlib.sha256(encoded).hexdigest(), "matched_modules": sorted(seed)}
+    evidence = {
+        "matched": bool(seed) and len(common) == 1 and not changed,
+        "seed_module_count": len(seed), "buildimage_module_count": len(image),
+        "shared_graph_sha256": hashlib.sha256(encoded).hexdigest(), "matched_modules": sorted(seed),
+        "common_modules": common,
+        "differences": [{
+            "seed_module": key, "seed_dependencies": seed[key],
+            "buildimage_candidates": {candidate: dependencies for candidate, dependencies in image.items()
+                                      if candidate.rsplit("@", 1)[0] == key.rsplit("@", 1)[0]},
+        } for key in changed],
+    }
+    if not evidence["matched"]:
+        raise ResolutionMismatch(evidence)
+    return evidence
 
 
 def resolved_graph(workspace, common_source, temporary, name, buildimage):
@@ -402,7 +419,11 @@ def main():
                         receipt["buildimage_inputs"] = verify_consumer_contract(image_workspace, fixture)
                         seed_graph = resolved_graph(workspace, common_source, graph_root, "seed", image_workspace)
                         image_graph = resolved_graph(image_workspace, common_source, graph_root, "buildimage", image_workspace)
-                        receipt["module_resolution"] = compare_resolution(seed_graph, image_graph)
+                        try:
+                            receipt["module_resolution"] = compare_resolution(seed_graph, image_graph)
+                        except ResolutionMismatch as error:
+                            receipt["module_resolution"] = error.evidence
+                            raise
                     options = {"targets": MAKE_TARGETS, "queries": MAKE_PACKAGES} if args.seed_for_make else {}
                     phase = build_phase(name, workspace, common_source, phase_root, args.architecture, **options)
                     receipt["phases"].append(phase)
