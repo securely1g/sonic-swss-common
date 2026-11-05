@@ -1,0 +1,22 @@
+load(":image_common_inputs.bzl", "image_common_inputs", "release_inputs")
+
+# The config-engine image also consumes Common outside the runtime TARs:
+# sonic-cfggen imports its Python binding as a build tool, and the Rust
+# supervisor listener links its shared library with the release settings.
+release_inputs(
+    name = "common_release_libraries",
+    testonly = True,
+    exec_library = "@sonic_swss_common//:libswsscommon_consolidated.so",
+    library = "@sonic_swss_common//:libswsscommon_consolidated.so",
+    tags = ["manual"],
+)
+
+# Explicitly requested by the full Make-image cache proof. The ordinary
+# two-package proof continues to build only its external Common targets.
+image_common_inputs(
+    name = "image_common_execution_inputs",
+    testonly = True,
+    python_binding = "@sonic_swss_common//pyext:swsscommon",
+    release_inputs = ":common_release_libraries",
+    tags = ["manual"],
+)
