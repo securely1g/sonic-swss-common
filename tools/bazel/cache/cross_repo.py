@@ -131,7 +131,10 @@ def graph_modules(graph):
         key = node["key"]
         referenced.add(key)
         if not node.get("unexpanded", False):
-            modules.setdefault(key, set()).update(item["key"] for item in node.get("dependencies", []))
+            # Bazel renders direct edges that close a cycle separately from
+            # other dependencies. Their placement depends on tree traversal.
+            modules.setdefault(key, set()).update(
+                item["key"] for field in ("dependencies", "cycles") for item in node.get(field, []))
         for field in ("dependencies", "indirectDependencies", "cycles"):
             for child in node.get(field, []):
                 visit(child)
@@ -172,7 +175,7 @@ def compare_resolution(seed_graph, image_graph):
 def resolved_graph(workspace, common_source, temporary, name, buildimage):
     output_base = temporary / (name + "-graph-output")
     command = [managed.BAZEL, "--batch", "--nosystem_rc", "--nohome_rc", "--output_base=" + str(output_base),
-               "mod", "graph", "--output=json", "--extension_info=hidden", "--lockfile_mode=off",
+               "mod", "graph", "--output=json", "--cycles", "--extension_info=hidden", "--lockfile_mode=off",
                "--registry=https://raw.githubusercontent.com/securely1g/sonic-bazel-registry/main",
                "--registry=https://bcr.bazel.build", "--override_module=sonic-swss-common=" + str(common_source),
                managed.downloader_option(), "--color=no", "--curses=no"]

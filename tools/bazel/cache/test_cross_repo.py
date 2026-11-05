@@ -517,6 +517,18 @@ class ManagedSeedTest(TestCase):
         with self.assertRaisesRegex(ValueError, "Incomplete"):
             cross_repo.compare_resolution(incomplete, image)
 
+    def test_resolution_preserves_cycle_edges_across_tree_traversals(self):
+        seed = {"key": "<root>", "root": True, "dependencies": [
+            {"key": "sonic-swss-common@_", "dependencies": [
+                {"key": "a@1", "dependencies": [
+                    {"key": "b@1", "cycles": [{"key": "a@1", "unexpanded": True}]}]}]}]}
+        image = {"key": "<root>", "root": True, "dependencies": [
+            {"key": "sonic-swss-common@_", "dependencies": [{"key": "a@1", "unexpanded": True}]},
+            {"key": "b@1", "dependencies": [
+                {"key": "a@1", "cycles": [{"key": "b@1", "unexpanded": True}]}]}]}
+        self.assertTrue(cross_repo.compare_resolution(seed, image)["matched"])
+        self.assertEqual(cross_repo.graph_modules(seed)["b@1"], ["a@1"])
+
     def test_static_contract_rejects_dependency_drift(self):
         fixture = cross_repo.ROOT / "tools/bazel/cache/consumer"
         with tempfile.TemporaryDirectory() as directory:
