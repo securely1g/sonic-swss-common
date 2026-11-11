@@ -27,12 +27,12 @@ bazel_dep(name = "bazel_skylib", version = "1.9.0")
 bazel_dep(name = "platforms", version = "1.1.0")
 bazel_dep(name = "tar.bzl", version = "0.10.5-sonic.1")
 bazel_dep(name = "rules_distroless", version = "0.9.4.sonic.15")
-bazel_dep(name = "libyang", version = "3.12.2.sonic.4")
+bazel_dep(name = "libyang", version = "3.12.2.sonic.6")
 
 # Use the owner-exported native shared targets and matching runtime metadata.
 # This retains the SONiC nexthop patch and the public Debian source URL.
 bazel_dep(name = "libnl3", version = "3.7.0.sonic.7")
-bazel_dep(name = "sonic-build-infra", version = "0.0.26-51c838da6ff57295fde6e0bc3807841cb31a8568", repo_name = "sonic_build_infra")
+bazel_dep(name = "sonic-build-infra", version = "0.0.28-9965823498ab54816de5addb6084638470dd04d7", repo_name = "sonic_build_infra")
 bazel_dep(name = "sonic-yang-mgmt", version = "1.0.0-9ab452d22773c41783092ae3bd6c206d6c257c8d", repo_name = "sonic_yang_mgmt")
 bazel_dep(name = "sonic-yang-models", version = "1.0.0-9ab452d22773c41783092ae3bd6c206d6c257c8d", repo_name = "sonic_yang_models")
 
@@ -40,7 +40,7 @@ bazel_dep(name = "sonic-yang-models", version = "1.0.0-9ab452d22773c41783092ae3b
 # candidate. Select the complete current candidate for the standalone graph.
 single_version_override(
     module_name = "sonic-build-infra",
-    version = "0.0.26-51c838da6ff57295fde6e0bc3807841cb31a8568",
+    version = "0.0.28-9965823498ab54816de5addb6084638470dd04d7",
 )
 
 # Upstream 0.10.5 sorts above the patched prerelease. Keep transitive requests
