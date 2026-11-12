@@ -190,3 +190,17 @@ For example:
 * Push your changes to your private fork and do "pull-request" to this repository
 * Use a pull request to do code review
 * Use issues to keep track of what is going on
+
+### Common Go bindings for gNMI
+
+Bazel gNMI consumers depend on `@sonic_swss_common//goext:swsscommon`.
+The owner generates and compiles the SWIG binding once. Both
+`github.com/sonic-net/sonic-swss-common/goext` and gNMI's existing
+`github.com/sonic-net/sonic-gnmi/swsscommon` import refer to that same Go archive.
+Keep the gNMI source imports and native Make generator unchanged; resolve the
+legacy import to this owner target in the consumer's BUILD files.
+
+`//goext/tests/gnmi:alias_test` checks that both spellings expose identical Go
+types and interoperate through the owner-built C++ library. Native AMD64 CI runs
+it with YANG enabled and disabled. A consumer root still selects its Go SDK and
+must validate its own gNMI API and service behavior.

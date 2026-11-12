@@ -119,6 +119,18 @@ jobs:
         continue-on-error: true
         run: bash tools/bazel/record_disk_usage.sh before-yang
 
+      - name: Test the gNMI import of Common's Go binding
+        if: inputs.arch == 'AMD64'
+        run: |
+          bazel test ${{ inputs.bazel_args }} \
+            --lockfile_mode=update \
+            --test_env=SONIC_TEST_RUNTIME_ID \
+            --//tools/bazel:yang_modules=${{ matrix.yang == 'enabled' && 'True' || 'False' }} \
+            --test_output=errors //goext/tests/gnmi:alias_test
+          mkdir -p artifacts/validation/gnmi-binding
+          cp -L bazel-testlogs/goext/tests/gnmi/alias_test/test.log \
+            bazel-testlogs/goext/tests/gnmi/alias_test/test.xml artifacts/validation/gnmi-binding/
+
       - name: Build and test with YANG
         if: matrix.yang == 'enabled'
         id: yang_build
@@ -143,6 +155,11 @@ jobs:
           //crates/swss-common:bindings_dir
           //crates/swss-common:swss_common
           //crates/swss-common:swss_common_test
+          //crates/swss-common:swss_common_async_test
+          //crates/swss-common-testing:swss_common_testing
+          //crates/swss-common-testing:swss_common_testing_async
+          //tools/bazel/rust:testing_interface_test
+          //tools/bazel/rust:async_testing_interface_test
           //tools/bazel/rust:shared_serde_test
           //dist:libswsscommon_sdk
           //dist:libswsscommon_sdk_test
@@ -190,6 +207,10 @@ jobs:
           cp bazel-testlogs/crates/swss-common/swss_common_test/test.xml bazel-testlogs/crates/swss-common/swss_common_test/test.log artifacts/validation/yang/
           mkdir -p artifacts/validation/yang/shared-serde
           cp bazel-testlogs/tools/bazel/rust/shared_serde_test/test.xml bazel-testlogs/tools/bazel/rust/shared_serde_test/test.log artifacts/validation/yang/shared-serde/
+          for target in crates/swss-common/swss_common_async_test tools/bazel/rust/testing_interface_test tools/bazel/rust/async_testing_interface_test; do
+            mkdir -p "artifacts/validation/yang/rust-interfaces/$target"
+            cp "bazel-testlogs/$target/test.xml" "bazel-testlogs/$target/test.log" "artifacts/validation/yang/rust-interfaces/$target/"
+          done
           cp MODULE.bazel.lock artifacts/validation/yang/
           mkdir -p artifacts/validation/yang/go
           cp -L bazel-testlogs/goext/swsscommon_runtime_test/test.log bazel-testlogs/goext/swsscommon_runtime_test/test.xml artifacts/validation/yang/go/
@@ -246,6 +267,11 @@ jobs:
           //crates/swss-common:bindings_dir
           //crates/swss-common:swss_common
           //crates/swss-common:swss_common_test
+          //crates/swss-common:swss_common_async_test
+          //crates/swss-common-testing:swss_common_testing
+          //crates/swss-common-testing:swss_common_testing_async
+          //tools/bazel/rust:testing_interface_test
+          //tools/bazel/rust:async_testing_interface_test
           //tools/bazel/rust:shared_serde_test
           //dist:libswsscommon_sdk
           //dist:libswsscommon_sdk_test
@@ -292,6 +318,10 @@ jobs:
           cp bazel-testlogs/crates/swss-common/swss_common_test/test.xml bazel-testlogs/crates/swss-common/swss_common_test/test.log artifacts/validation/no-yang/
           mkdir -p artifacts/validation/no-yang/shared-serde
           cp bazel-testlogs/tools/bazel/rust/shared_serde_test/test.xml bazel-testlogs/tools/bazel/rust/shared_serde_test/test.log artifacts/validation/no-yang/shared-serde/
+          for target in crates/swss-common/swss_common_async_test tools/bazel/rust/testing_interface_test tools/bazel/rust/async_testing_interface_test; do
+            mkdir -p "artifacts/validation/no-yang/rust-interfaces/$target"
+            cp "bazel-testlogs/$target/test.xml" "bazel-testlogs/$target/test.log" "artifacts/validation/no-yang/rust-interfaces/$target/"
+          done
           cp MODULE.bazel.lock artifacts/validation/no-yang/
           mkdir -p artifacts/validation/no-yang/go
           cp -L bazel-testlogs/goext/swsscommon_runtime_test/test.log bazel-testlogs/goext/swsscommon_runtime_test/test.xml artifacts/validation/no-yang/go/
