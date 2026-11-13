@@ -225,6 +225,21 @@ jobs:
             bazel-bin/pyext/swsscommon_pkg.debug_symbols.tar \
             artifacts/yang/
 
+      - name: Retain the AMD64 YANG test runtime
+        if: inputs.arch == 'AMD64' && matrix.yang == 'enabled'
+        run: |
+          cp -L bazel-bin/tools/bazel/runtime/test_runtime.tar artifacts/yang/
+          cp artifacts/validation/test-runtime.json \
+            artifacts/validation/source-commit.txt \
+            artifacts/validation/source-tree.txt \
+            artifacts/validation/feature-mode.txt \
+            artifacts/validation/userspace-architecture.txt artifacts/yang/
+          (cd artifacts/yang && sha256sum test_runtime.tar > test_runtime.tar.sha256)
+          mkdir -p artifacts/validation/yang/declared-loader
+          cp -L bazel-testlogs/tools/bazel/runtime/declared_loader_test/test.log \
+            bazel-testlogs/tools/bazel/runtime/declared_loader_test/test.xml \
+            artifacts/validation/yang/declared-loader/
+
       - name: Record disk usage before no-YANG build
         if: matrix.yang == 'disabled'
         continue-on-error: true
