@@ -8,7 +8,7 @@ and their standalone tests belong to the SONiC Bazel registry.
 
 `MODULE.bazel` selects these registry modules:
 
-- [`sonic-yang-models` `1.0.0-9ab452d22773c41783092ae3bd6c206d6c257c8d`](https://github.com/securely1g/sonic-bazel-registry/blob/f5166bbc4c3e5728137db337007ed3ca5a031a84/modules/sonic-yang-models/1.0.0-9ab452d22773c41783092ae3bd6c206d6c257c8d/README.md)
+- [`sonic-yang-models` `1.0.1-b0a9362a7a1b4b5e1b7188c019d256f7c8aaff9f`](https://github.com/securely1g/sonic-bazel-registry/tree/main/modules/sonic-yang-models/1.0.1-b0a9362a7a1b4b5e1b7188c019d256f7c8aaff9f)
   owns the production model sources/templates, setup manifest, preparation
   action, runtime package, and model/package checks. Common consumes its
   `@sonic_yang_models//:yang_models` directory.
@@ -16,13 +16,13 @@ and their standalone tests belong to the SONiC Bazel registry.
   supplies the `sonic_yang` Python modules through
   `@sonic_yang_mgmt//:sonic_yang_mgmt`. It owns the library's Python dependencies
   and its standalone runtime test.
-- Native [`libyang` `3.12.2.sonic.1`](https://github.com/securely1g/sonic-bazel-registry/blob/f5166bbc4c3e5728137db337007ed3ca5a031a84/modules/libyang/3.12.2.sonic.1/README.md)
+- Native [`libyang` `3.12.2.sonic.6`](https://github.com/securely1g/sonic-bazel-registry/tree/main/modules/libyang/3.12.2.sonic.6)
   supplies matching headers, `libyang.so.3`, and runtime/debug packages. It
   preserves the production `LYD_VALIDATE_NOEXTDEPS` patch and large-file support;
   PCRE2 and xxHash are source-built static implementation dependencies.
 
-Both SONiC YANG modules use production buildimage revision
-[`9ab452d22773c41783092ae3bd6c206d6c257c8d`](https://github.com/securely1g/sonic-buildimage/tree/9ab452d22773c41783092ae3bd6c206d6c257c8d).
+The models and management modules use the buildimage revisions encoded in
+their respective registry versions.
 The management module depends on registry
 [`libyang-python` `3.1.0-sonic.1`](https://github.com/securely1g/sonic-bazel-registry/blob/f5166bbc4c3e5728137db337007ed3ca5a031a84/modules/libyang-python/3.1.0-sonic.1/README.md),
 which builds CESNET/libyang-python `v3.1.0` with the four patches used by the

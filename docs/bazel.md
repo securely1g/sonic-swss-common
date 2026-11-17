@@ -133,9 +133,8 @@ propagate from dependencies.
 
 ## Go build inputs
 
-This branch selects `rules_go 0.64.1-sonic.1`, which adds the remaining relative
-cgo header-path repair to upstream 0.64.1. The root override preserves that
-prerelease selection, and standalone builds retain Go SDK 1.25.0. The original
+This branch selects `rules_go 0.65.0.sonic.1`, which carries the relative
+cgo header-path repair on upstream 0.65.0. Standalone builds use Go SDK 1.25.0. The original
 upstream regression cases pass with the repair on native AMD64 and ARM64 using
 Bazel 8.5.1 ([validation run](https://github.com/securely1g/sonic-swss-common/actions/runs/37182396550)).
 
@@ -490,9 +489,7 @@ generated manifest with deterministic timestamps.
 Common's package test checks its actual library, program, configuration and
 symlink headers. Generic manifest and reproducibility tests accompany the
 `tar.bzl` patch in the registry, and deployment integration tests remain in
-`sonic-build-infra`. The root module pins the patched `tar.bzl` version because
-Bazel otherwise ranks a transitive request for upstream `0.10.5` above
-`0.10.5-sonic.1`.
+`sonic-build-infra`. The root module selects `tar.bzl@0.10.5.sonic.2`.
 
 ## Debug symbols
 

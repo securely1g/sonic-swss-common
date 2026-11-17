@@ -16,7 +16,8 @@ load(":bzlmod.bzl", "IS_BZLMOD")
 # Hermetic apt packages, via rules_distroless. bzlmod only.
 _APT_DEPS = [
     "@trixie//libhiredis-dev:libhiredis",
-    "@trixie//nlohmann-json3-dev:nlohmann-json3",
+    # nlohmann JSON is header-only, including for consumers of the shared library.
+    "@trixie//nlohmann-json3-dev:nlohmann-json3_headers",
     "@libnl3//:libnl_3",
     "@libnl3//:libnl_route_3",
     "@libnl3//:libnl_nf_3",
