@@ -40,6 +40,25 @@ class RuntimePreparationTest(unittest.TestCase):
             self.assertEqual(selected["zlib1g"]["version"], "1:2.3-1")
             self.assertEqual({p["architecture"] for p in selected.values()}, {architecture})
 
+    def test_selects_the_trixie_set_from_the_exported_multi_suite_lock(self):
+        lock = resolved_lock()
+        repositories = next(iter(lock["moduleExtensions"].values()))["general"]["generatedRepoSpecs"]
+        packages = json.loads(repositories["trixie"]["attributes"]["lock_content"])["packages"]
+        sets = {arch: {key.rsplit("=", 1)[0]: p["version"] for key, p in packages.items()
+                       if p["architecture"] == arch and p["name"] in prepare.RUNTIME_ROOTS}
+                for arch in ("amd64", "arm64")}
+        packages["/bookworm/libzmq5:amd64=1"] = dict(packages["/trixie/libzmq5:amd64=2.3-1"],
+                                                       version="1", suite="bookworm")
+        document = {"packages": packages, "dependency_sets": {"trixie": {"sets": sets}}}
+        repositories["exported"] = {"repoRuleId": "apt%export_lock_repository",
+                                    "attributes": {"content": json.dumps(document)}}
+        repositories["trixie"]["attributes"] = {
+            "depset_name": "trixie", "lock_file": "@@rules_distroless++apt+exported//:apt.lock.json"}
+        for arch in sets:
+            with self.subTest(architecture=arch):
+                self.assertEqual(prepare.select_runtime(lock, arch),
+                                 prepare.select_runtime(resolved_lock(), arch))
+
     def test_mismatched_download_provenance_is_rejected(self):
         lock = resolved_lock()
         repositories = next(iter(lock["moduleExtensions"].values()))["general"]["generatedRepoSpecs"]

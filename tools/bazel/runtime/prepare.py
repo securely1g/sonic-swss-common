@@ -38,18 +38,37 @@ def sha256(path):
         return hashlib.file_digest(stream, "sha256").hexdigest()
 
 
+def runtime_catalog(repositories, architecture):
+    hub = repositories["trixie"]["attributes"]
+    if "lock_content" in hub:
+        packages = json.loads(hub["lock_content"])["packages"]
+        return packages, packages.keys()
+
+    # The shared lock is exported by a sibling repository in the APT extension.
+    # Only roots selected for this dependency set may seed the runtime closure.
+    repository, separator, filename = hub["lock_file"].partition("//:")
+    if not separator or not repository.startswith("@@") or filename != "apt.lock.json":
+        raise ValueError("Invalid exported APT lock label")
+    export = repositories.get(repository.rsplit("+", 1)[-1])
+    if not export or not export["repoRuleId"].endswith("%export_lock_repository"):
+        raise ValueError("Missing exported APT lock in the resolved extension")
+    document = json.loads(export["attributes"]["content"])
+    roots = document["dependency_sets"][hub["depset_name"]]["sets"][architecture]
+    return document["packages"], [f"{key}={version}" for key, version in roots.items()]
+
+
 def select_runtime(lock, architecture):
     extensions = [value["general"] for key, value in lock["moduleExtensions"].items()
                   if key.endswith("//apt:extensions.bzl%apt")]
     if len(extensions) != 1:
         raise ValueError("Expected one resolved Distroless apt extension")
     repositories = extensions[0]["generatedRepoSpecs"]
-    packages = json.loads(repositories["trixie"]["attributes"]["lock_content"])["packages"]
+    packages, root_ids = runtime_catalog(repositories, architecture)
     selected = {}
     pending = []
     for root in RUNTIME_ROOTS:
-        matches = [key for key, package in packages.items()
-                   if package["name"] == root and package["architecture"] == architecture]
+        matches = [key for key in root_ids
+                   if packages[key]["name"] == root and packages[key]["architecture"] == architecture]
         if len(matches) != 1:
             raise ValueError(f"Expected one selected {root} package for {architecture}")
         pending.extend(matches)
