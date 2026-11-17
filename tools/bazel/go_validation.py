@@ -15,8 +15,8 @@ import subprocess
 ROOT = Path(__file__).resolve().parents[2]
 REGISTRY_REPO = "https://github.com/securely1g/sonic-bazel-registry.git"
 MAIN = "https://raw.githubusercontent.com/securely1g/sonic-bazel-registry/main"
-VERSION = "0.64.1-sonic.1"
-CGO_SHA256 = "5f7e9f6788a1ba8d57aa4752212d0fad390657b3cb3d40c2962886ae8fe28bd9"
+VERSION = "0.65.0.sonic.1"
+CGO_SHA256 = "4eaf0252856619ca376e9f32782db84748689e9b68ddcfcd75dfa5fcd45861ad"
 
 
 def write_json(path, value):
