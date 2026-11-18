@@ -32,7 +32,7 @@ bazel_dep(name = "libyang", version = "3.12.2.sonic.6")
 # Use the owner-exported native shared targets and matching runtime metadata.
 # This retains the SONiC nexthop patch and the public Debian source URL.
 bazel_dep(name = "libnl3", version = "3.7.0.sonic.7")
-bazel_dep(name = "sonic-build-infra", version = "0.0.37-316e298e77ab5cfa69af9b0c05ec24d5d94bbe1e", repo_name = "sonic_build_infra")
+bazel_dep(name = "sonic-build-infra", version = "0.0.37-d31541a95fdf477302f1b109f2105eee81c86617", repo_name = "sonic_build_infra")
 bazel_dep(name = "sonic-yang-mgmt", version = "1.0.0-9ab452d22773c41783092ae3bd6c206d6c257c8d", repo_name = "sonic_yang_mgmt")
 bazel_dep(name = "sonic-yang-models", version = "1.0.1-b0a9362a7a1b4b5e1b7188c019d256f7c8aaff9f", repo_name = "sonic_yang_models")
 
@@ -40,7 +40,7 @@ bazel_dep(name = "sonic-yang-models", version = "1.0.1-b0a9362a7a1b4b5e1b7188c01
 # declared BFD linker behavior across the standalone dependency graph.
 single_version_override(
     module_name = "sonic-build-infra",
-    version = "0.0.37-316e298e77ab5cfa69af9b0c05ec24d5d94bbe1e",
+    version = "0.0.37-d31541a95fdf477302f1b109f2105eee81c86617",
 )
 
 # Use the SONiC tar implementation with default_mtime across the graph.
@@ -137,3 +137,15 @@ use_repo(
 )
 
 bazel_dep(name = "patchelf", version = "0.18.0.bcr.1")
+
+# host-services Cargo.lock selects this Rust source while its default build.rs
+# binds to the installed Common C API. Reuse the owner-generated bindings below.
+http_archive = use_repo_rule("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
+
+http_archive(
+    name = "swss_common_4b86a770_src",
+    build_file = "//tools/bazel/rust:swss_common_4b86a770.BUILD.bazel",
+    sha256 = "c815671515f45821c74abd024b40781035ba9460b07db90f8b55535b6c318fed",
+    strip_prefix = "sonic-swss-common-4b86a770d3ad8a091b2a59aa3b981f938f1298d3/crates/swss-common",
+    urls = ["https://github.com/sonic-net/sonic-swss-common/archive/4b86a770d3ad8a091b2a59aa3b981f938f1298d3.tar.gz"],
+)

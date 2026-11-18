@@ -161,6 +161,7 @@ jobs:
           //tools/bazel/rust:testing_interface_test
           //tools/bazel/rust:async_testing_interface_test
           //tools/bazel/rust:shared_serde_test
+          //tools/bazel/rust/locked_source_test:caller_test
           //dist:libswsscommon_sdk
           //dist:libswsscommon_sdk_test
           //:runtime_packages.json
@@ -207,7 +208,7 @@ jobs:
           cp bazel-testlogs/crates/swss-common/swss_common_test/test.xml bazel-testlogs/crates/swss-common/swss_common_test/test.log artifacts/validation/yang/
           mkdir -p artifacts/validation/yang/shared-serde
           cp bazel-testlogs/tools/bazel/rust/shared_serde_test/test.xml bazel-testlogs/tools/bazel/rust/shared_serde_test/test.log artifacts/validation/yang/shared-serde/
-          for target in crates/swss-common/swss_common_async_test tools/bazel/rust/testing_interface_test tools/bazel/rust/async_testing_interface_test; do
+          for target in crates/swss-common/swss_common_async_test tools/bazel/rust/testing_interface_test tools/bazel/rust/async_testing_interface_test tools/bazel/rust/locked_source_test/caller_test; do
             mkdir -p "artifacts/validation/yang/rust-interfaces/$target"
             cp "bazel-testlogs/$target/test.xml" "bazel-testlogs/$target/test.log" "artifacts/validation/yang/rust-interfaces/$target/"
           done
@@ -273,6 +274,7 @@ jobs:
           //tools/bazel/rust:testing_interface_test
           //tools/bazel/rust:async_testing_interface_test
           //tools/bazel/rust:shared_serde_test
+          //tools/bazel/rust/locked_source_test:caller_test
           //dist:libswsscommon_sdk
           //dist:libswsscommon_sdk_test
           //:runtime_packages.json
@@ -318,7 +320,7 @@ jobs:
           cp bazel-testlogs/crates/swss-common/swss_common_test/test.xml bazel-testlogs/crates/swss-common/swss_common_test/test.log artifacts/validation/no-yang/
           mkdir -p artifacts/validation/no-yang/shared-serde
           cp bazel-testlogs/tools/bazel/rust/shared_serde_test/test.xml bazel-testlogs/tools/bazel/rust/shared_serde_test/test.log artifacts/validation/no-yang/shared-serde/
-          for target in crates/swss-common/swss_common_async_test tools/bazel/rust/testing_interface_test tools/bazel/rust/async_testing_interface_test; do
+          for target in crates/swss-common/swss_common_async_test tools/bazel/rust/testing_interface_test tools/bazel/rust/async_testing_interface_test tools/bazel/rust/locked_source_test/caller_test; do
             mkdir -p "artifacts/validation/no-yang/rust-interfaces/$target"
             cp "bazel-testlogs/$target/test.xml" "bazel-testlogs/$target/test.log" "artifacts/validation/no-yang/rust-interfaces/$target/"
           done

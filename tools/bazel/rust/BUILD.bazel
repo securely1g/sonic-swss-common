@@ -48,3 +48,5 @@ rust_test(
         "@sonic_rust_deps//:tokio",
     ],
 )
+
+exports_files(["swss_common_4b86a770.BUILD.bazel"])
