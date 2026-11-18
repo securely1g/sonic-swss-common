@@ -1,7 +1,7 @@
 # Keep bazel_compatibility in sync with sonic-buildimage's .bazelversion.
 module(
     name = "sonic-swss-common",
-    version = "0.0.8",
+    version = "0.0.10",
     bazel_compatibility = [
         ">=8.5.1",
         "<=8.5.1",
@@ -15,7 +15,7 @@ bazel_dep(name = "googletest", version = "1.11.0", repo_name = "com_google_googl
 bazel_dep(name = "glog", version = "0.5.0", repo_name = "com_github_google_glog")
 bazel_dep(name = "rules_python", version = "1.9.0.sonic.1")
 bazel_dep(name = "rules_rs", version = "0.1.0")
-bazel_dep(name = "sonic-rust-deps", version = "0.0.5-dd364f207d7b320a5af12c81da6d10893f292205", repo_name = "sonic_rust_deps")
+bazel_dep(name = "sonic-rust-deps", version = "0.0.5-5bf69bc0a7d9ea9f4a5606264be592867cd29d1e", repo_name = "sonic_rust_deps")
 
 # rules_rs selects rules_cc with sanitize_pwd; rules_go excludes that
 # C/C++ feature from cgo so its builder paths stay valid after changing cwd.
@@ -26,13 +26,13 @@ bazel_dep(name = "rules_shell", version = "0.6.1")
 bazel_dep(name = "bazel_skylib", version = "1.9.0")
 bazel_dep(name = "platforms", version = "1.1.0")
 bazel_dep(name = "tar.bzl", version = "0.10.5.sonic.2")
-bazel_dep(name = "rules_distroless", version = "0.9.4.sonic.20")
-bazel_dep(name = "libyang", version = "3.12.2.sonic.6")
+bazel_dep(name = "rules_distroless", version = "0.9.4.sonic.22")
+bazel_dep(name = "libyang", version = "3.12.2.sonic.8")
 
 # Use the owner-exported native shared targets and matching runtime metadata.
 # This retains the SONiC nexthop patch and the public Debian source URL.
-bazel_dep(name = "libnl3", version = "3.7.0.sonic.7")
-bazel_dep(name = "sonic-build-infra", version = "0.0.37-316e298e77ab5cfa69af9b0c05ec24d5d94bbe1e", repo_name = "sonic_build_infra")
+bazel_dep(name = "libnl3", version = "3.7.0.sonic.8")
+bazel_dep(name = "sonic-build-infra", version = "0.0.38-0baa4acc9eac9ccc793b81104b1580d530271cbe", repo_name = "sonic_build_infra")
 bazel_dep(name = "sonic-yang-mgmt", version = "1.0.0-9ab452d22773c41783092ae3bd6c206d6c257c8d", repo_name = "sonic_yang_mgmt")
 bazel_dep(name = "sonic-yang-models", version = "1.0.1-b0a9362a7a1b4b5e1b7188c019d256f7c8aaff9f", repo_name = "sonic_yang_models")
 
@@ -40,7 +40,7 @@ bazel_dep(name = "sonic-yang-models", version = "1.0.1-b0a9362a7a1b4b5e1b7188c01
 # declared BFD linker behavior across the standalone dependency graph.
 single_version_override(
     module_name = "sonic-build-infra",
-    version = "0.0.37-316e298e77ab5cfa69af9b0c05ec24d5d94bbe1e",
+    version = "0.0.38-0baa4acc9eac9ccc793b81104b1580d530271cbe",
 )
 
 # Use the SONiC tar implementation with default_mtime across the graph.
