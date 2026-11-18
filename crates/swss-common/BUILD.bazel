@@ -95,3 +95,8 @@ alias(
     actual = ":swss_common",
     visibility = ["//visibility:public"],
 )
+
+exports_files(
+    ["locked_source.bzl"],
+    visibility = ["//visibility:public"],
+)

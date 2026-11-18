@@ -175,7 +175,14 @@ runtime_packages(
     },
     changelog = "debian/changelog",
     control = "debian/control",
-    debian_files = {"compat": "debian/compat"},
+    control_file_helpers = [
+        ["dh_makeshlibs"],
+        ["dh_installdeb"],
+    ],
+    debian_files = {
+        "compat": "debian/compat",
+        "conffiles": "debian/conffiles",
+    },
     dependencies = ["@libnl3//:runtime_packages.json"] + select({
         "//tools/bazel:yang_modules_enabled": ["@libyang//:runtime_packages.json"],
         "//conditions:default": [],
