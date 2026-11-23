@@ -94,6 +94,22 @@ def select_runtime(lock, architecture):
     return dict(sorted(selected.items()))
 
 
+def select_locked_runtime(lock, architecture):
+    from sonic_apt.inputs import subset_inputs
+
+    # Select the same versioned lock used by the reproducible APT extension.
+    # Its generated repositories are no longer serialized in MODULE.bazel.lock.
+    _, manifest = subset_inputs(lock, "trixie", architecture, list(RUNTIME_ROOTS))
+    selected = {}
+    for identity, row in manifest["packages"].items():
+        name = row["name"]
+        if name.endswith("-dev") or row["architecture"] not in (architecture, "all"):
+            raise ValueError(f"Unexpected package in runtime closure: {identity}")
+        selected[name] = {key: row[key] for key in ("name", "version", "architecture", "sha256", "urls")}
+        selected[name]["suite"] = lock["packages"][identity]["suite"]
+    return dict(sorted(selected.items()))
+
+
 def snapshot_sources(selected, architecture):
     sources = set()
     for package in selected.values():
@@ -201,7 +217,9 @@ def fingerprint(value):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--lock", type=Path, default=Path("MODULE.bazel.lock"))
+    inputs = parser.add_mutually_exclusive_group()
+    inputs.add_argument("--apt-lock", type=Path)
+    inputs.add_argument("--lock", type=Path, default=Path("MODULE.bazel.lock"))
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--image-reference", required=True)
     parser.add_argument("--env-file", type=Path)
@@ -211,7 +229,15 @@ def main():
     architecture = subprocess.check_output(["dpkg", "--print-architecture"], text=True).strip()
     if architecture not in ("amd64", "arm64"):
         raise ValueError("Only native AMD64 and ARM64 test containers are supported")
-    selected = select_runtime(json.loads(args.lock.read_text()), architecture)
+    lock = args.apt_lock or args.lock
+    document = json.loads(lock.read_text())
+    selected = (select_locked_runtime(document, architecture) if args.apt_lock
+                else select_runtime(document, architecture))
+    # Bazel runs from the runfiles tree. Resolve operator outputs in the workspace.
+    workspace = Path(os.environ.get("BUILD_WORKSPACE_DIRECTORY", "."))
+    args.output = workspace / args.output
+    if args.env_file:
+        args.env_file = workspace / args.env_file
     # Validate provenance even when an earlier setup already installed all roots.
     snapshot_sources(selected, architecture)
     before = inventory()
@@ -227,7 +253,7 @@ def main():
         "architecture": architecture,
         "image_reference": args.image_reference,
         "os_release": Path("/etc/os-release").read_text(),
-        "lock_sha256": sha256(args.lock),
+        "lock_sha256": sha256(lock),
         "build_packages": selected,
         "installed_packages": after,
         "preserved_base_packages": before,

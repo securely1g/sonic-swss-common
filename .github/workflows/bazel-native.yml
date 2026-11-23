@@ -109,7 +109,7 @@ jobs:
 
       - name: Prepare the container runtime
         run: >-
-          python3 -B tools/bazel/runtime/prepare.py
+          bazel run ${{ inputs.bazel_args }} //tools/bazel/runtime:prepare --
           --image-reference debian:trixie-20260918
           --output artifacts/validation/test-runtime.json
           --env-file "$GITHUB_ENV"

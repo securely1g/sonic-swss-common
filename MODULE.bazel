@@ -32,7 +32,7 @@ bazel_dep(name = "libyang", version = "3.12.2.sonic.9")
 # Use the owner-exported native shared targets and matching runtime metadata.
 # This retains the SONiC nexthop patch and the public Debian source URL.
 bazel_dep(name = "libnl3", version = "3.7.0.sonic.10")
-bazel_dep(name = "sonic-build-infra", version = "0.0.42-da5f4c8d370f501572f435ade330ec209c9c0203", repo_name = "sonic_build_infra")
+bazel_dep(name = "sonic-build-infra", version = "0.0.44-35726399908a3beb947174e9359f902077928289", repo_name = "sonic_build_infra")
 bazel_dep(name = "sonic-yang-mgmt", version = "1.0.0-9ab452d22773c41783092ae3bd6c206d6c257c8d", repo_name = "sonic_yang_mgmt")
 bazel_dep(name = "sonic-yang-models", version = "1.0.1-dd732f9512a84966487951250adae8e3e5c9943e", repo_name = "sonic_yang_models")
 
@@ -40,7 +40,7 @@ bazel_dep(name = "sonic-yang-models", version = "1.0.1-dd732f9512a84966487951250
 # declared BFD linker behavior across the standalone dependency graph.
 single_version_override(
     module_name = "sonic-build-infra",
-    version = "0.0.42-da5f4c8d370f501572f435ade330ec209c9c0203",
+    version = "0.0.44-35726399908a3beb947174e9359f902077928289",
 )
 
 # Use the SONiC tar implementation with default_mtime across the graph.
