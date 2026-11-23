@@ -1,11 +1,21 @@
 load("@rules_cc//cc:cc_binary.bzl", "cc_binary")
 load("@rules_distroless//distroless:defs.bzl", "flatten")
+load("@rules_python//python:defs.bzl", "py_binary")
 load("@rules_shell//shell:sh_binary.bzl", "sh_binary")
 load("@rules_shell//shell:sh_test.bzl", "sh_test")
 
 package(default_visibility = ["//visibility:public"])
 
 exports_files(["run_with_runtime.py"])
+
+py_binary(
+    name = "prepare",
+    srcs = ["prepare.py"],
+    args = ["--apt-lock=$(rootpath @sonic_build_infra//apt:apt.lock.json)"],
+    data = ["@sonic_build_infra//apt:apt.lock.json"],
+    python_version = "3.13",
+    deps = ["@sonic_build_infra//apt:lib"],
+)
 
 # Native runtime dependencies from the same pinned package set as the build.
 flatten(

@@ -87,7 +87,7 @@ Compilation and linking still use Bazel's declared packages and sysroot.
 
 ```sh
 bazel build --nobuild --//tools/bazel:yang_modules=False //:libswsscommon_shared
-python3 -B tools/bazel/runtime/prepare.py \
+bazel run //tools/bazel/runtime:prepare -- \
   --image-reference debian:trixie-20260918 \
   --output /tmp/common-test-runtime.json
 export SONIC_TEST_RUNTIME_ID="$(python3 -c \
@@ -95,10 +95,10 @@ export SONIC_TEST_RUNTIME_ID="$(python3 -c \
 ```
 
 Add `--config=aarch64` for native ARM64. Use `yang_modules=True` when preparing a YANG
-build. Analysis writes `MODULE.bazel.lock` without compiling the targets.
+build. Analysis resolves the configured targets without compiling them.
 
 The setup helper reads versions, snapshot URLs, checksums, and dependency lists
-from that lock. APT downloads and installs missing runtime packages; the helper
+from the selected build-infra module’s reviewed `apt/apt.lock.json`. APT downloads and installs missing runtime packages; the helper
 checks their hashes before installation. It uses only the resolved snapshot
 sources and installs no development packages. Existing base packages remain
 unchanged. For example, a newer compatible base libc or UUID library stays in
