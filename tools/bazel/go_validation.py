@@ -15,7 +15,7 @@ import subprocess
 ROOT = Path(__file__).resolve().parents[2]
 REGISTRY_REPO = "https://github.com/securely1g/sonic-bazel-registry.git"
 MAIN = "https://raw.githubusercontent.com/securely1g/sonic-bazel-registry/main"
-VERSION = "0.65.0.sonic.1"
+VERSION = "0.65.0.sonic.2"
 CGO_SHA256 = "4eaf0252856619ca376e9f32782db84748689e9b68ddcfcd75dfa5fcd45861ad"
 
 
