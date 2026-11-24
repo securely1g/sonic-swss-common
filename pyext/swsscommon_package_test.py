@@ -12,6 +12,7 @@ import tarfile
 
 
 _CHECK_IMPORT = r"""
+import ctypes
 import os
 from pathlib import Path
 
@@ -48,8 +49,20 @@ def check_runtime_library(prefix, required):
     library = matches.pop()
     assert library.is_relative_to(runtime_root), library
 
+check_runtime_library("libswsscommon.so.", True)
 check_runtime_library("libhiredis.so.", True)
 check_runtime_library("libyang.so.", os.environ["SWSS_YANG_MODE"] == "enabled")
+
+# The native authentication API reads the same singleton that Python initializes.
+class Result(ctypes.Structure):
+    _fields_ = [("exception", ctypes.c_int), ("message", ctypes.c_void_p), ("location", ctypes.c_void_p)]
+
+common = ctypes.CDLL("libswsscommon.so.0")
+common.SWSSSonicDBConfig_initialize.argtypes = [ctypes.c_char_p]
+common.SWSSSonicDBConfig_initialize.restype = Result
+config = runtime_root / "run/redis/sonic-db/database_config.json"
+assert common.SWSSSonicDBConfig_initialize(os.fsencode(config)).exception == 0
+assert binding.SonicDBConfig.isInit(), "Python and the C API must share the database configuration"
 
 yang_classes = (
     "DefaultValueProvider",

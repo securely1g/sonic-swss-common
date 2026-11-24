@@ -38,7 +38,7 @@ cc_library(
         "//conditions:default": [],
     }),
     deps = [
-        "//:libswsscommon",
+        "//:libswsscommon_shared",
         "@trixie//python3-dev:python3",
     ],
 )
@@ -56,7 +56,7 @@ cc_binary(
     linkshared = 1,
     linkstatic = 1,
     deps = [
-        "//:libswsscommon",
+        "//:libswsscommon_shared",
         "@trixie//python3-dev:python3",
     ],
 )
@@ -73,7 +73,7 @@ py_native_library(
     name = "swsscommon",
     srcs = [":redis_adapter"],
     cc_deps = [
-        "//:common",
+        "//:libswsscommon_shared",
         "@trixie//python3-dev:python3",
     ],
     native_py = "py3/swsscommon.py",
@@ -128,7 +128,7 @@ sh_test(
     args = [
         "$(location //tools/bazel/runtime:run_with_runtime)",
         "$(location @patchelf//:patchelf)",
-        "$(location //tools/bazel/runtime:test_runtime)",
+        "$(location //tools/bazel/runtime:python_test_runtime)",
         "$(location :swsscommon_pkg)",
         "$(location :swsscommon_pkg.debug_symbols)",
     ] + select({
@@ -139,7 +139,7 @@ sh_test(
         ":swsscommon_pkg",
         ":swsscommon_pkg.debug_symbols",
         "//tools/bazel/runtime:run_with_runtime",
-        "//tools/bazel/runtime:test_runtime",
+        "//tools/bazel/runtime:python_test_runtime",
         "@patchelf",
     ],
 )
