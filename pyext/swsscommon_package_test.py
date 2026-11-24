@@ -23,6 +23,15 @@ package_root = Path(os.environ["SWSS_PACKAGE_ROOT"]).resolve()
 for module in (swsscommon, binding, native):
     assert Path(module.__file__).resolve().is_relative_to(package_root), module.__file__
 
+# The redis-py adapter calls this exported SWIG function. An invalid path
+# exercises the native exception mapping without contacting a Redis server.
+try:
+    binding.openRedisUnixSocket("relative.sock", 1, False)
+except ValueError as error:
+    assert "absolute Redis Unix path" in str(error), error
+else:
+    raise AssertionError("Relative Redis socket path should have been rejected")
+
 runtime_root = Path(os.environ["SWSS_RUNTIME_ROOT"]).resolve()
 loaded = set()
 for line in Path("/proc/self/maps").read_text().splitlines():
