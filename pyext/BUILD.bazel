@@ -2,6 +2,7 @@
 # load("@rules_cc//cc:cc_library.bzl", "cc_library")
 # load("@rules_cc//cc:defs.bzl", "cc_binary")
 # load("@rules_shell//shell:sh_test.bzl", "sh_test")
+load("@bazel_skylib//rules:copy_file.bzl", "copy_file")
 load("@bazel_skylib//rules:write_file.bzl", "write_file")
 load("@sonic_build_infra//python:py_native_library.bzl", "py_native_library")
 load("@sonic_build_infra//swig:defs.bzl", "swig_gen", "swig_lib_deb")
@@ -60,9 +61,17 @@ cc_binary(
     ],
 )
 
+# Expose the redis-py adapter beside the generated package for Bazel imports.
+copy_file(
+    name = "redis_adapter",
+    src = "py3/redis.py",
+    out = "swsscommon/redis.py",
+)
+
 # Python library wrapping the native swsscommon extension
 py_native_library(
     name = "swsscommon",
+    srcs = [":redis_adapter"],
     cc_deps = [
         "//:common",
         "@trixie//python3-dev:python3",
@@ -94,6 +103,7 @@ write_file(
 sonic_deploy_tar(
     name = "swsscommon_pkg",
     srcs = [
+        "py3/redis.py",
         "py3/swsscommon.py",
         ":installed_init_py",
     ],
@@ -105,6 +115,7 @@ sonic_deploy_tar(
     force_debug_build = True,
     mtree = [
         "usr/lib/python3/dist-packages/swsscommon/__init__.py type=file uid=0 gid=0 mode=0644 content=$(location :installed_init_py)",
+        "usr/lib/python3/dist-packages/swsscommon/redis.py type=file uid=0 gid=0 mode=0644 content=$(location py3/redis.py)",
         "usr/lib/python3/dist-packages/swsscommon/swsscommon.py type=file uid=0 gid=0 mode=0644 content=$(location py3/swsscommon.py)",
         "usr/lib/python3/dist-packages/swsscommon/_swsscommon.so type=link uid=0 gid=0 time=0 link=lib_swsscommon.so",
     ],

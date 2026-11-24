@@ -75,7 +75,7 @@ def check_debug_symbols(install_root, symbols_archive):
         archive.extractall(symbols_root, filter="data")
     package = install_root / "usr/lib/python3/dist-packages/swsscommon"
     assert {path.name for path in package.iterdir()} == {
-        "__init__.py", "swsscommon.py", "_swsscommon.so", "lib_swsscommon.so",
+        "__init__.py", "redis.py", "swsscommon.py", "_swsscommon.so", "lib_swsscommon.so",
     }
     assert (package / "_swsscommon.so").readlink() == Path("lib_swsscommon.so")
     binary = package / "lib_swsscommon.so"
