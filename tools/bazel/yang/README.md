@@ -8,15 +8,15 @@ and their standalone tests belong to the SONiC Bazel registry.
 
 `MODULE.bazel` selects these registry modules:
 
-- [`sonic-yang-models` `1.0.1-b0a9362a7a1b4b5e1b7188c019d256f7c8aaff9f`](https://github.com/securely1g/sonic-bazel-registry/tree/main/modules/sonic-yang-models/1.0.1-b0a9362a7a1b4b5e1b7188c019d256f7c8aaff9f)
+- [`sonic-yang-models` `1.0.1-dd732f9512a84966487951250adae8e3e5c9943e`](https://github.com/sonic-net/sonic-bazel-registry/tree/main/modules/sonic-yang-models/1.0.1-dd732f9512a84966487951250adae8e3e5c9943e)
   owns the production model sources/templates, setup manifest, preparation
   action, runtime package, and model/package checks. Common consumes its
   `@sonic_yang_models//:yang_models` directory.
-- [`sonic-yang-mgmt` `1.0.0-9ab452d22773c41783092ae3bd6c206d6c257c8d`](https://github.com/securely1g/sonic-bazel-registry/blob/f5166bbc4c3e5728137db337007ed3ca5a031a84/modules/sonic-yang-mgmt/1.0.0-9ab452d22773c41783092ae3bd6c206d6c257c8d/README.md)
+- [`sonic-yang-mgmt` `1.0.0-9ab452d22773c41783092ae3bd6c206d6c257c8d`](https://github.com/sonic-net/sonic-bazel-registry/blob/main/modules/sonic-yang-mgmt/1.0.0-9ab452d22773c41783092ae3bd6c206d6c257c8d/README.md)
   supplies the `sonic_yang` Python modules through
   `@sonic_yang_mgmt//:sonic_yang_mgmt`. It owns the library's Python dependencies
   and its standalone runtime test.
-- Native [`libyang` `3.12.2.sonic.6`](https://github.com/securely1g/sonic-bazel-registry/tree/main/modules/libyang/3.12.2.sonic.6)
+- Native [`libyang` `3.12.2.sonic.9`](https://github.com/sonic-net/sonic-bazel-registry/tree/main/modules/libyang/3.12.2.sonic.9)
   supplies matching headers, `libyang.so.3`, and runtime/debug packages. It
   preserves the production `LYD_VALIDATE_NOEXTDEPS` patch and large-file support;
   PCRE2 and xxHash are source-built static implementation dependencies.
@@ -24,7 +24,7 @@ and their standalone tests belong to the SONiC Bazel registry.
 The models and management modules use the buildimage revisions encoded in
 their respective registry versions.
 The management module depends on registry
-[`libyang-python` `3.1.0-sonic.1`](https://github.com/securely1g/sonic-bazel-registry/blob/f5166bbc4c3e5728137db337007ed3ca5a031a84/modules/libyang-python/3.1.0-sonic.1/README.md),
+[`libyang-python` `3.1.0.sonic.7`](https://github.com/sonic-net/sonic-bazel-registry/blob/main/modules/libyang-python/3.1.0.sonic.7/README.md),
 which builds CESNET/libyang-python `v3.1.0` with the four patches used by the
 production `src/libyang3-py3/Makefile`. The registry owns CFFI generation and the
 binding's dependencies and tests. This differs from standalone Azure's
@@ -48,7 +48,7 @@ defines and generated Python/Go API behavior.
 
 Common publishes its own runtime, debug, CLI, and Python archives. Enabled
 deployments additionally need the model and libyang runtime packages supplied
-by the [registry workflows](https://github.com/securely1g/sonic-bazel-registry/actions):
+by the [registry workflows](https://github.com/sonic-net/sonic-bazel-registry/actions):
 `@sonic_yang_models//:yang_models_pkg`, `@libyang//:libyang_pkg`, and libyang's
 matching `@libyang//:libyang_pkg.debug_symbols`. Use the selected module versions
 and deployment architecture. Download the matching

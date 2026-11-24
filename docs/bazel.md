@@ -453,7 +453,7 @@ Every package download contains these seven archives:
 
 Common's artifacts contain its own library, bindings, CLI, and symbols. Enabled
 deployments also require packages owned by the
-[SONiC Bazel registry](https://github.com/securely1g/sonic-bazel-registry/actions):
+[SONiC Bazel registry](https://github.com/sonic-net/sonic-bazel-registry/actions):
 
 - `sonic-yang-models`: `//:yang_models_pkg` installs the prepared model payload
   under `/usr/local/yang-models`, the path used by `DefaultValueProvider`.

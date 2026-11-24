@@ -97,7 +97,7 @@ are written to `bazel-bin/dist/libswsscommon_pkg.tar`,
 
 Enabled deployments also need the prepared models under `/usr/local/yang-models`
 and the matching native libyang runtime. These dependencies are built, tested,
-and published by the [SONiC Bazel registry](https://github.com/securely1g/sonic-bazel-registry/actions),
+and published by the [SONiC Bazel registry](https://github.com/sonic-net/sonic-bazel-registry/actions),
 separately from Common's four package archives. Use the module versions selected
 by `MODULE.bazel` and retain libyang's matching debug archive. See the
 [deployment inputs](docs/bazel.md#dependency-runtime-packages) for details.
