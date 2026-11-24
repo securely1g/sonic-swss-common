@@ -138,8 +138,8 @@ sh_test(
     data = [
         ":swsscommon_pkg",
         ":swsscommon_pkg.debug_symbols",
-        "//tools/bazel/runtime:run_with_runtime",
         "//tools/bazel/runtime:python_test_runtime",
+        "//tools/bazel/runtime:run_with_runtime",
         "@patchelf",
     ],
 )
