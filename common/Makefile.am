@@ -51,6 +51,8 @@ common_libswsscommon_la_SOURCES = \
     common/logger.cpp                \
     common/redisreply.cpp            \
     common/configdb.cpp              \
+    common/redisauth.cpp              \
+    common/redisauth.h                \
     common/dbconnector.cpp           \
     common/dbinterface.cpp           \
     common/sonicv2connector.cpp      \
@@ -140,3 +142,5 @@ common_swssloglevel_CXXFLAGS = $(DBGFLAGS) $(AM_CFLAGS) $(CFLAGS_COMMON) $(CODE_
 common_swssloglevel_CPPFLAGS = $(DBGFLAGS) $(AM_CFLAGS) $(CFLAGS_COMMON) $(CODE_COVERAGE_CPPFLAGS)
 common_swssloglevel_LDADD = common/libswsscommon.la $(CODE_COVERAGE_LIBS)
 common_swssloglevel_LDFLAGS = -Wl,-z,now $(LDFLAGS)
+
+common_libswsscommon_la_SOURCES += common/redissocket.cpp common/redissocket.h

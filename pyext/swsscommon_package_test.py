@@ -12,6 +12,7 @@ import tarfile
 
 
 _CHECK_IMPORT = r"""
+import ctypes
 import os
 from pathlib import Path
 
@@ -22,6 +23,15 @@ from swsscommon import swsscommon as binding
 package_root = Path(os.environ["SWSS_PACKAGE_ROOT"]).resolve()
 for module in (swsscommon, binding, native):
     assert Path(module.__file__).resolve().is_relative_to(package_root), module.__file__
+
+# The redis-py adapter calls this exported SWIG function. An invalid path
+# exercises the native exception mapping without contacting a Redis server.
+try:
+    binding.openRedisUnixSocket("relative.sock", 1, False)
+except ValueError as error:
+    assert "absolute Redis Unix path" in str(error), error
+else:
+    raise AssertionError("Relative Redis socket path should have been rejected")
 
 runtime_root = Path(os.environ["SWSS_RUNTIME_ROOT"]).resolve()
 loaded = set()
@@ -39,8 +49,20 @@ def check_runtime_library(prefix, required):
     library = matches.pop()
     assert library.is_relative_to(runtime_root), library
 
+check_runtime_library("libswsscommon.so.", True)
 check_runtime_library("libhiredis.so.", True)
 check_runtime_library("libyang.so.", os.environ["SWSS_YANG_MODE"] == "enabled")
+
+# The native authentication API reads the same singleton that Python initializes.
+class Result(ctypes.Structure):
+    _fields_ = [("exception", ctypes.c_int), ("message", ctypes.c_void_p), ("location", ctypes.c_void_p)]
+
+common = ctypes.CDLL("libswsscommon.so.0")
+common.SWSSSonicDBConfig_initialize.argtypes = [ctypes.c_char_p]
+common.SWSSSonicDBConfig_initialize.restype = Result
+config = runtime_root / "run/redis/sonic-db/database_config.json"
+assert common.SWSSSonicDBConfig_initialize(os.fsencode(config)).exception == 0
+assert binding.SonicDBConfig.isInit(), "Python and the C API must share the database configuration"
 
 yang_classes = (
     "DefaultValueProvider",
@@ -75,7 +97,7 @@ def check_debug_symbols(install_root, symbols_archive):
         archive.extractall(symbols_root, filter="data")
     package = install_root / "usr/lib/python3/dist-packages/swsscommon"
     assert {path.name for path in package.iterdir()} == {
-        "__init__.py", "swsscommon.py", "_swsscommon.so", "lib_swsscommon.so",
+        "__init__.py", "redis.py", "swsscommon.py", "_swsscommon.so", "lib_swsscommon.so",
     }
     assert (package / "_swsscommon.so").readlink() == Path("lib_swsscommon.so")
     binary = package / "lib_swsscommon.so"

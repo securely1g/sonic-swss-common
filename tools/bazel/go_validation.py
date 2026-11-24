@@ -13,8 +13,8 @@ import subprocess
 
 
 ROOT = Path(__file__).resolve().parents[2]
-REGISTRY_REPO = "https://github.com/securely1g/sonic-bazel-registry.git"
-MAIN = "https://raw.githubusercontent.com/securely1g/sonic-bazel-registry/main"
+REGISTRY_REPO = "https://github.com/sonic-net/sonic-bazel-registry.git"
+MAIN = "https://raw.githubusercontent.com/sonic-net/sonic-bazel-registry/main"
 VERSION = "0.65.0.sonic.2"
 CGO_SHA256 = "4eaf0252856619ca376e9f32782db84748689e9b68ddcfcd75dfa5fcd45861ad"
 
@@ -40,7 +40,7 @@ def selected_registry():
 def check_registry_options(output):
     registry, _ = selected_registry()
     options = re.findall(r"--registry=(\S+)", output)
-    sonic_options = [url for url in options if "securely1g/sonic-bazel-registry/" in url]
+    sonic_options = [url for url in options if "sonic-net/sonic-bazel-registry/" in url]
     if sonic_options != [registry]:
         raise ValueError("The effective Bazel options must select exactly the recorded SONiC registry endpoint")
 
@@ -48,7 +48,7 @@ def check_registry_options(output):
 def record(artifacts):
     configuration = (ROOT / ".bazelrc").read_text()
     endpoints = [line for line in configuration.splitlines()
-                 if "--registry=" in line and "securely1g/sonic-bazel-registry/" in line]
+                 if "--registry=" in line and "sonic-net/sonic-bazel-registry/" in line]
     if endpoints != ["common --registry=" + MAIN]:
         raise ValueError("Expected exactly the canonical SONiC main registry endpoint")
     registry, ref = selected_registry()

@@ -41,6 +41,16 @@ flatten(
     }),
 )
 
+# Python and C bindings share the installed Common library and its DB configuration.
+flatten(
+    name = "python_test_runtime",
+    testonly = True,
+    tars = [
+        ":test_runtime",
+        "//dist:libswsscommon_pkg",
+    ],
+)
+
 sh_binary(
     name = "run_with_runtime",
     testonly = True,
