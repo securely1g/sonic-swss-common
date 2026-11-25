@@ -11,6 +11,10 @@ on:
 permissions:
   contents: read
 
+env:
+  SONIC_BAZEL_REGISTRY_URL: https://raw.githubusercontent.com/securely1g/sonic-bazel-registry/history3
+  SONIC_BAZEL_REGISTRY_REVISION: 55c38af2284155eee8c7bf2481e719ec23fa2695
+
 jobs:
   native-amd64:
     name: Native AMD64
