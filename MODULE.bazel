@@ -15,7 +15,7 @@ bazel_dep(name = "googletest", version = "1.11.0", repo_name = "com_google_googl
 bazel_dep(name = "glog", version = "0.5.0", repo_name = "com_github_google_glog")
 bazel_dep(name = "rules_python", version = "1.9.0.sonic.2")
 bazel_dep(name = "rules_rs", version = "0.1.0")
-bazel_dep(name = "sonic-rust-deps", version = "0.0.5-5bf69bc0a7d9ea9f4a5606264be592867cd29d1e", repo_name = "sonic_rust_deps")
+bazel_dep(name = "sonic-rust-deps", version = "0.0.5-4064a814e8530300a7acbad4a9aff0621e2fb98e", repo_name = "sonic_rust_deps")
 
 # rules_rs selects rules_cc with sanitize_pwd; rules_go excludes that
 # C/C++ feature from cgo so its builder paths stay valid after changing cwd.
@@ -32,7 +32,7 @@ bazel_dep(name = "libyang", version = "3.12.2.sonic.9")
 # Use the owner-exported native shared targets and matching runtime metadata.
 # This retains the SONiC nexthop patch and the public Debian source URL.
 bazel_dep(name = "libnl3", version = "3.7.0.sonic.10")
-bazel_dep(name = "sonic-build-infra", version = "0.0.44-35726399908a3beb947174e9359f902077928289", repo_name = "sonic_build_infra")
+bazel_dep(name = "sonic-build-infra", version = "0.0.45-77ef625a4ddafc8cdc15f3cc6aee31eabac8a5de", repo_name = "sonic_build_infra")
 bazel_dep(name = "sonic-yang-mgmt", version = "1.0.0-9ab452d22773c41783092ae3bd6c206d6c257c8d", repo_name = "sonic_yang_mgmt")
 bazel_dep(name = "sonic-yang-models", version = "1.0.1-dd732f9512a84966487951250adae8e3e5c9943e", repo_name = "sonic_yang_models")
 
@@ -40,7 +40,7 @@ bazel_dep(name = "sonic-yang-models", version = "1.0.1-dd732f9512a84966487951250
 # declared BFD linker behavior across the standalone dependency graph.
 single_version_override(
     module_name = "sonic-build-infra",
-    version = "0.0.44-35726399908a3beb947174e9359f902077928289",
+    version = "0.0.45-77ef625a4ddafc8cdc15f3cc6aee31eabac8a5de",
 )
 
 # Use the SONiC tar implementation with default_mtime across the graph.
