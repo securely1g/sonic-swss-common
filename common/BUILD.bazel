@@ -76,6 +76,7 @@ filegroup(
         [
             "*.cpp",
             "c-api/*.cpp",
+            "c-api/internal/*.h",
         ],
         exclude = [
             "loglevel.cpp",
