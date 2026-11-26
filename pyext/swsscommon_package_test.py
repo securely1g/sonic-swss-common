@@ -8,7 +8,7 @@ import zlib
 from pathlib import Path
 import subprocess
 import sys
-import tarfile
+import shutil
 
 
 _CHECK_IMPORT = r"""
@@ -93,8 +93,7 @@ Path(os.environ["SWSS_RESULT_FILE"]).write_text("passed\n")
 
 def check_debug_symbols(install_root, symbols_archive):
     symbols_root = Path(os.environ["TEST_TMPDIR"]) / "swsscommon-symbols"
-    with tarfile.open(symbols_archive) as archive:
-        archive.extractall(symbols_root, filter="data")
+    shutil.unpack_archive(symbols_archive, symbols_root, format="tar", filter="data")
     package = install_root / "usr/lib/python3/dist-packages/swsscommon"
     assert {path.name for path in package.iterdir()} == {
         "__init__.py", "redis.py", "swsscommon.py", "_swsscommon.so", "lib_swsscommon.so",
@@ -133,8 +132,7 @@ def main():
         raise ValueError(f"Unknown YANG mode: {yang_mode}")
 
     install_root = Path(os.environ["TEST_TMPDIR"]) / "swsscommon-package"
-    with tarfile.open(archive) as package:
-        package.extractall(install_root, filter="data")
+    shutil.unpack_archive(archive, install_root, format="tar", filter="data")
 
     check_debug_symbols(install_root, symbols_archive)
 

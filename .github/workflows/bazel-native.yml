@@ -30,6 +30,7 @@ jobs:
         yang: [enabled, disabled]
     runs-on: ${{ inputs.runner }}
     env:
+      BAZEL_ARGS: ${{ inputs.bazel_args }}
       BAZEL_REMOTE_AUTH: ${{ github.ref == 'refs/heads/master' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && secrets.BAZEL_REMOTE_AUTH || '' }}
     container:
       image: debian:trixie-20260918
@@ -94,22 +95,22 @@ jobs:
       - name: Verify Linux sandbox isolation
         run: >-
           python3 -B tools/bazel/sandbox/verify.py
-          --output artifacts/validation/linux-sandbox.json -- ${{ inputs.bazel_args }}
+          --output artifacts/validation/linux-sandbox.json -- $BAZEL_ARGS
 
       - name: Check Bazel formatting
-        run: bazel run ${{ inputs.bazel_args }} //tools/bazel/buildifier:buildifier.format.check
+        run: bazel run $BAZEL_ARGS //tools/bazel/buildifier:buildifier.format.check
 
       - name: Resolve the native runtime dependency versions
         run: >-
           bazel build --nobuild
-          ${{ inputs.bazel_args }}
+          $BAZEL_ARGS
           --lockfile_mode=update
           --//tools/bazel:yang_modules=${{ matrix.yang == 'enabled' && 'True' || 'False' }}
           //:libswsscommon_shared
 
       - name: Prepare the container runtime
         run: >-
-          bazel run ${{ inputs.bazel_args }} //tools/bazel/runtime:prepare --
+          bazel run $BAZEL_ARGS //tools/bazel/runtime:prepare --
           --image-reference debian:trixie-20260918
           --output artifacts/validation/test-runtime.json
           --env-file "$GITHUB_ENV"
@@ -122,7 +123,7 @@ jobs:
       - name: Test the gNMI import of Common's Go binding
         if: inputs.arch == 'AMD64'
         run: |
-          bazel test ${{ inputs.bazel_args }} \
+          bazel test $BAZEL_ARGS \
             --lockfile_mode=update \
             --test_env=SONIC_TEST_RUNTIME_ID \
             --//tools/bazel:yang_modules=${{ matrix.yang == 'enabled' && 'True' || 'False' }} \
@@ -136,7 +137,7 @@ jobs:
         id: yang_build
         run: >-
           bazel test
-          ${{ inputs.bazel_args }}
+          $BAZEL_ARGS
           --lockfile_mode=update
           --nocache_test_results
           --test_env=SONIC_TEST_RUNTIME_ID
@@ -173,6 +174,7 @@ jobs:
           //pyext:swsscommon_pkg.debug_symbols
           //goext:swsscommon
           //goext:swsscommon_runtime_test
+          //goext/redisconn:redisconn_test
           //tools/bazel/runtime:declared_loader_test
           //tests:status_code_util_test
           //tests:redis_lua_path_test
@@ -251,7 +253,7 @@ jobs:
         id: no_yang_build
         run: >-
           bazel test
-          ${{ inputs.bazel_args }}
+          $BAZEL_ARGS
           --lockfile_mode=update
           --nocache_test_results
           --test_env=SONIC_TEST_RUNTIME_ID
@@ -286,6 +288,7 @@ jobs:
           //pyext:swsscommon_pkg.debug_symbols
           //goext:swsscommon
           //goext:swsscommon_runtime_test
+          //goext/redisconn:redisconn_test
           //tools/bazel/runtime:declared_loader_test
           //tests:status_code_util_test
           //tests:redis_lua_path_test
@@ -346,7 +349,7 @@ jobs:
             # Build and query this runtime package as the same top-level target.
             # A transitive package can use a different configuration. Match the
             # test-only environment option inherited from .bazelrc too.
-            libyang_runtime_archive="$(bazel cquery ${{ inputs.bazel_args }} \
+            libyang_runtime_archive="$(bazel cquery $BAZEL_ARGS \
               --test_env=SWSS_EXPECT_RUNPATH=1 \
               --test_env=SONIC_TEST_RUNTIME_ID \
               --//tools/bazel:yang_modules=True --output=files \
@@ -358,7 +361,7 @@ jobs:
             installed_runtime_args+=(--libyang-package "$libyang_runtime_archive")
           fi
           for package in libnl-3 libnl-route-3 libnl-nf-3; do
-            archive="$(bazel cquery ${{ inputs.bazel_args }} \
+            archive="$(bazel cquery $BAZEL_ARGS \
               --test_env=SWSS_EXPECT_RUNPATH=1 --test_env=SONIC_TEST_RUNTIME_ID \
               --//tools/bazel:yang_modules=${{ matrix.yang == 'enabled' && 'True' || 'False' }} \
               --output=files "config(@libnl3//:${package}_pkg, target)")"
@@ -423,7 +426,7 @@ jobs:
 
       - name: Record resolved Go inputs
         if: always()
-        run: python3 tools/bazel/go_validation.py collect artifacts/validation ${{ inputs.bazel_args }}
+        run: python3 tools/bazel/go_validation.py collect artifacts/validation $BAZEL_ARGS
 
       - name: Upload native validation evidence
         if: always()

@@ -34,9 +34,8 @@ private:
     std::string previous;
 };
 
-void expectMissingAt(const std::string &directory)
+void expectMissingAt(const std::string &directory, const std::string &name)
 {
-    const std::string name = ".sonic-bazel-absent-" + std::to_string(getpid()) + ".lua";
     try {
         swss::loadLuaScript(name);
         FAIL() << "A missing declared Lua script must not silently succeed";
@@ -63,13 +62,18 @@ TEST(RedisLuaPath, MissingDeclaredScriptDoesNotFallBack)
 {
     const std::string directory = fixture.substr(0, fixture.find_last_of('/'));
     ScopedLuaDirectory scope(directory.c_str());
-    expectMissingAt(directory);
+    expectMissingAt(directory, ".sonic-bazel-absent-" + std::to_string(getpid()) + ".lua");
 }
 
-TEST(RedisLuaPath, UnsetAndEmptyKeepInstalledDefault)
+TEST(RedisLuaPath, OnlyAnOverrideRestrictsNestedScriptNames)
 {
-    { ScopedLuaDirectory scope(nullptr); expectMissingAt("/usr/share/swss"); }
-    { ScopedLuaDirectory scope(""); expectMissingAt("/usr/share/swss"); }
+    const std::string name = ".sonic-bazel-absent-" + std::to_string(getpid()) + "/script.lua";
+    { ScopedLuaDirectory scope(nullptr); expectMissingAt("/usr/share/swss", name); }
+    { ScopedLuaDirectory scope(""); expectMissingAt("/usr/share/swss", name); }
+
+    const std::string directory = fixture.substr(0, fixture.find_last_of('/'));
+    ScopedLuaDirectory scope(directory.c_str());
+    EXPECT_THROW(swss::loadLuaScript(name), std::invalid_argument);
 }
 TEST(RedisLuaPath, RejectsScriptTraversal)
 {
