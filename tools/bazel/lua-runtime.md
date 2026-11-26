@@ -1,13 +1,13 @@
 # Lua scripts in a declared runtime
 
-Common normally reads its Redis scripts from `/usr/share/swss`. That installed
-SONiC default is unchanged. A nonempty `SWSS_COMMON_LUA_DIR` selects a different
-absolute directory containing the same owner-provided scripts; an unset or
-empty value uses the installed default. The directory is trusted process
+When `SWSS_COMMON_LUA_DIR` is unset or empty, Common appends the caller's path
+to `/usr/share/swss/`, so relative paths such as `subdir/script.lua` work as before.
+A nonempty override selects an absolute directory containing the same
+owner-provided scripts. The directory is trusted process
 configuration, like the runtime library root, and must not be set from network
 requests. `secure_getenv` ignores it across a privileged execution boundary.
-Script names must be single file names. The configured directory and requested
-file are canonicalized, and a script symlink cannot escape that directory. A
+With the override, script names must be single file names. The loader
+canonicalizes the directory and file, and a script symlink cannot escape that directory. A
 missing script still raises an error and never falls back silently to a
 different directory. These checks use POSIX/C++11 interfaces, preserving legacy
 Make consumers without adding a C++17 filesystem requirement.

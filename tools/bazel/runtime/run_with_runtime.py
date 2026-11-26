@@ -82,8 +82,7 @@ def main():
 
     runtime_root = Path(os.environ["TEST_TMPDIR"]) / "swsscommon-runtime"
     runtime_root.mkdir()
-    with tarfile.open(archive) as package:
-        package.extractall(runtime_root, filter=runtime_member_filter)
+    shutil.unpack_archive(archive, runtime_root, format="tar", filter=runtime_member_filter)
 
     runtime_root = runtime_root.resolve()
     library_dirs = set()

@@ -66,18 +66,16 @@ static inline std::string loadLuaScript(const std::string& path)
 {
     SWSS_LOG_ENTER();
 
-    // Script names are separate from the trusted runtime-directory choice.
-    if (path.empty() || path == "." || path == ".." ||
-        path.find_first_of("/\\") != std::string::npos)
-    {
-        throw std::invalid_argument("Lua script must be a single file name");
-    }
-
     // Ignore process-environment overrides across a privileged exec boundary.
     const char *directory = secure_getenv("SWSS_COMMON_LUA_DIR");
     if (!directory || !*directory)
     {
         return readTextFile("/usr/share/swss/" + path);
+    }
+    if (path.empty() || path == "." || path == ".." ||
+        path.find_first_of("/\\") != std::string::npos)
+    {
+        throw std::invalid_argument("Lua script must be a single file name");
     }
     if (directory[0] != '/')
     {
